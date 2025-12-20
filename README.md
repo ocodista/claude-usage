@@ -1,6 +1,27 @@
 # Claude Usage
 
-Real-time token usage monitor for Claude Code.
+A Claude Code plugin for real-time token usage monitoring.
+
+## Installation
+
+```bash
+# Clone the plugin
+git clone https://github.com/ocodista/claude-usage.git
+
+# Install dependencies
+cd claude-usage && bun install
+
+# Load with Claude Code
+claude --plugin-dir /path/to/claude-usage
+```
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `/claude-usage:start` | Start the dashboard server |
+| `/claude-usage:stats` | Show quick token statistics |
+| `/claude-usage:open` | Open dashboard in browser |
 
 ## Features
 
@@ -9,21 +30,9 @@ Real-time token usage monitor for Claude Code.
 - **Session Analytics** - Per-session and per-message token breakdown
 - **Interactive Charts** - Usage trends, model comparison, session race
 
-## Quick Start
+## Dashboard
 
-```bash
-bun install
-bun run dev
-```
-
-Open http://localhost:3456
-
-## How It Works
-
-Watches `~/.claude/` for changes and parses:
-- `stats-cache.json` - Aggregated usage stats
-- `projects/*/*.jsonl` - Session message history
-- `history.jsonl` - Session metadata
+After running `/claude-usage:start`, open http://localhost:3456
 
 ## Tech Stack
 

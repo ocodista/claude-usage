@@ -1,0 +1,10 @@
+{
+  "name": "claude-usage",
+  "description": "Real-time token usage monitor with interactive dashboard",
+  "version": "1.0.0",
+  "author": {
+    "name": "ocodista"
+  },
+  "repository": "https://github.com/ocodista/claude-usage",
+  "license": "MIT"
+}
