@@ -6,7 +6,7 @@
   "plugins": [
     {
       "name": "claude-usage",
-      "source": ".",
+      "source": "./",
       "description": "Real-time token usage monitor with interactive dashboard",
       "version": "1.0.0",
       "author": {
@@ -15,7 +15,6 @@
       "repository": "https://github.com/ocodista/claude-usage",
       "license": "MIT",
       "keywords": ["tokens", "usage", "dashboard", "analytics", "cost"],
-      "commands": "../commands",
       "category": "analytics"
     }
   ]
