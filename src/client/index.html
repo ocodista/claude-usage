@@ -1,0 +1,3287 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Code Token Monitor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            // Anthropic-inspired palette
+            claude: {
+              coral: '#D97757',
+              'coral-dim': '#B8624A',
+              orange: '#E8956A',
+              cream: '#FAF6F1',
+            },
+            surface: {
+              '0': '#0D0D0D',
+              '1': '#141414',
+              '2': '#1A1A1A',
+              '3': '#212121',
+              '4': '#2A2A2A',
+            },
+            text: {
+              primary: '#F5F5F5',
+              secondary: '#A3A3A3',
+              muted: '#6B6B6B',
+            },
+            border: {
+              DEFAULT: '#2A2A2A',
+              subtle: '#1F1F1F',
+            },
+            accent: {
+              blue: '#5B9DD9',
+              green: '#5BBD72',
+              purple: '#9D7CD8',
+              amber: '#E5A855',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background: #0D0D0D;
+      color: #F5F5F5;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+    }
+    .card {
+      background: #141414;
+      border: 1px solid #1F1F1F;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .card-highlight {
+      border-color: #D97757;
+      background: linear-gradient(145deg, rgba(217, 119, 87, 0.08) 0%, #141414 100%);
+    }
+    .stat-value {
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      font-weight: 600;
+    }
+    .nav-tab {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+    .nav-tab-active {
+      background: #D97757;
+      color: #0D0D0D;
+    }
+    .nav-tab-inactive {
+      background: transparent;
+      color: #6B6B6B;
+    }
+    .nav-tab-inactive:hover {
+      background: #1A1A1A;
+      color: #A3A3A3;
+    }
+    .range-btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.15s ease;
+    }
+    .range-btn-active {
+      background: #2A2A2A;
+      color: #F5F5F5;
+    }
+    .range-btn-inactive {
+      background: transparent;
+      color: #6B6B6B;
+    }
+    .range-btn-inactive:hover {
+      background: #1A1A1A;
+      color: #A3A3A3;
+    }
+    .toggle-btn {
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      transition: all 0.15s ease;
+      border: 1px solid transparent;
+    }
+    .toggle-btn-active {
+      background: #1A1A1A;
+      border-color: #2A2A2A;
+      color: #F5F5F5;
+    }
+    .toggle-btn-inactive {
+      background: transparent;
+      color: #6B6B6B;
+    }
+    .toggle-btn-inactive:hover {
+      color: #A3A3A3;
+    }
+    .session-item { transition: background 0.15s ease; }
+    .session-item:hover { background: #1A1A1A; }
+    .pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #2A2A2A; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3A3A3A; }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #F5F5F5;
+    }
+    .section-desc {
+      font-size: 12px;
+      color: #6B6B6B;
+    }
+    .icon { width: 16px; height: 16px; stroke-width: 1.5; }
+    .divider { height: 1px; background: #1F1F1F; }
+    /* Modal styles */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      animation: fadeIn 0.15s ease;
+    }
+    .modal-content {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 101;
+      width: 90%;
+      max-width: 700px;
+      max-height: 85vh;
+      overflow-y: auto;
+      animation: slideIn 0.2s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translate(-50%, -48%); }
+      to { opacity: 1; transform: translate(-50%, -50%); }
+    }
+    .clickable-point { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+    // Utility functions
+    const formatNumber = (num) => {
+      if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
+      if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
+      if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
+      return num.toString();
+    };
+
+    const formatCurrency = (amount) => {
+      if (amount >= 1000) return `$${(amount / 1000).toFixed(1)}K`;
+      if (amount >= 1) return `$${amount.toFixed(2)}`;
+      return `$${amount.toFixed(3)}`;
+    };
+
+    const formatRelativeTime = (dateStr) => {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Yesterday';
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+
+    const getModelDisplayName = (model) => {
+      if (model.includes('opus')) return 'Opus 4.5';
+      if (model.includes('sonnet')) return 'Sonnet 4.5';
+      if (model.includes('haiku')) return 'Haiku';
+      return model;
+    };
+
+    const getModelColor = (model) => {
+      if (model.includes('opus')) return '#D97757';  // Anthropic coral
+      if (model.includes('sonnet')) return '#5B9DD9'; // Accent blue
+      if (model.includes('haiku')) return '#5BBD72';  // Accent green
+      return '#6B6B6B';
+    };
+
+    // Theme colors
+    const COLORS = {
+      coral: '#D97757',
+      blue: '#5B9DD9',
+      green: '#5BBD72',
+      purple: '#9D7CD8',
+      amber: '#E5A855',
+      text: '#F5F5F5',
+      textSecondary: '#A3A3A3',
+      textMuted: '#6B6B6B',
+      surface0: '#0D0D0D',
+      surface1: '#141414',
+      surface2: '#1A1A1A',
+      surface3: '#212121',
+      border: '#2A2A2A',
+      borderSubtle: '#1F1F1F',
+    };
+
+    // WebSocket hook
+    const useTokenData = () => {
+      const [stats, setStats] = useState({
+        totalTokens: 0, inputTokens: 0, outputTokens: 0,
+        cacheReadTokens: 0, cacheCreationTokens: 0, cacheEfficiency: 0,
+        totalSessions: 0, totalMessages: 0, totalCostUSD: 0, todayCostUSD: 0,
+        modelUsage: {}, dailyActivity: [], dailyModelTokens: [],
+        hourlyActivity: [], sessions: [], currentSession: null
+      });
+      const [connected, setConnected] = useState(false);
+
+      const connect = useCallback(() => {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+        ws.onopen = () => { setConnected(true); };
+        ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            if (message.type === 'initial' || message.type === 'stats_update') {
+              setStats(message.data);
+            }
+          } catch (err) { console.error('Parse error:', err); }
+        };
+        ws.onclose = () => {
+          setConnected(false);
+          setTimeout(connect, 2000);
+        };
+        ws.onerror = () => ws.close();
+        return ws;
+      }, []);
+
+      useEffect(() => {
+        const ws = connect();
+        return () => ws.close();
+      }, [connect]);
+
+      return { stats, connected };
+    };
+
+    // ECharts wrapper
+    const Chart = ({ option, height = 200, onClick }) => {
+      const chartRef = useRef(null);
+      const instanceRef = useRef(null);
+      const optionRef = useRef(option);
+      optionRef.current = option;
+
+      useEffect(() => {
+        if (chartRef.current) {
+          instanceRef.current = echarts.init(chartRef.current, 'dark');
+          instanceRef.current.setOption(optionRef.current, { notMerge: true });
+
+          const resizeObserver = new ResizeObserver(() => {
+            instanceRef.current?.resize();
+          });
+          resizeObserver.observe(chartRef.current);
+
+          return () => {
+            resizeObserver.disconnect();
+            instanceRef.current?.dispose();
+            instanceRef.current = null;
+          };
+        }
+      }, []);
+
+      useEffect(() => {
+        if (instanceRef.current) {
+          instanceRef.current.setOption(option, { notMerge: true });
+        }
+      }, [option]);
+
+      useEffect(() => {
+        if (instanceRef.current && onClick) {
+          instanceRef.current.on('click', onClick);
+          return () => {
+            instanceRef.current?.off('click', onClick);
+          };
+        }
+      }, [onClick]);
+
+      return <div ref={chartRef} style={{ width: '100%', height: `${height}px` }} />;
+    };
+
+    // Modal Component
+    const Modal = ({ isOpen, onClose, children }) => {
+      useEffect(() => {
+        const handleEscape = (e) => {
+          if (e.key === 'Escape') onClose();
+        };
+        if (isOpen) {
+          document.addEventListener('keydown', handleEscape);
+          document.body.style.overflow = 'hidden';
+        }
+        return () => {
+          document.removeEventListener('keydown', handleEscape);
+          document.body.style.overflow = '';
+        };
+      }, [isOpen, onClose]);
+
+      if (!isOpen) return null;
+
+      return ReactDOM.createPortal(
+        <>
+          <div className="modal-backdrop" onClick={onClose} />
+          <div className="modal-content card p-6">
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-white/10 transition-colors"
+              style={{ color: COLORS.textMuted }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+            {children}
+          </div>
+        </>,
+        document.body
+      );
+    };
+
+    // SVG Icons
+    const Icons = {
+      activity: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+      arrowDown: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>,
+      arrowUp: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>,
+      zap: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+      layers: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
+      clock: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+      barChart: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>,
+      trendingUp: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
+      chevronRight: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>,
+      race: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>,
+      dollar: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+      grid: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
+      target: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
+      calculator: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="8" y2="10.01"/><line x1="12" y1="10" x2="12" y2="10.01"/><line x1="16" y1="10" x2="16" y2="10.01"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="16" y1="14" x2="16" y2="14.01"/><line x1="8" y1="18" x2="8" y2="18.01"/><line x1="12" y1="18" x2="12" y2="18.01"/><line x1="16" y1="18" x2="16" y2="18.01"/></svg>,
+      growth: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>,
+      home: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+      info: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>,
+      arrowLeft: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>,
+      messageSquare: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+      user: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+      bot: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16.01"/><line x1="16" y1="16" x2="16" y2="16.01"/></svg>,
+      database: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+      tool: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
+      externalLink: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
+    };
+
+    // Stats Card
+    const StatCard = ({ title, value, subtitle, icon, accent }) => (
+      <div className={`card p-5 ${accent ? 'card-highlight' : ''}`}>
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-medium uppercase tracking-wider" style={{ color: COLORS.textMuted }}>{title}</span>
+          <span style={{ color: accent ? COLORS.coral : COLORS.textMuted }}>{icon}</span>
+        </div>
+        <div className="stat-value text-2xl" style={{ color: COLORS.text }}>{value}</div>
+        {subtitle && <div className="text-xs mt-1" style={{ color: COLORS.textMuted }}>{subtitle}</div>}
+      </div>
+    );
+
+    // Token Timeline Chart with toggles
+    const TokenTimeline = ({ dailyModelTokens, dailyActivity, timeRange, viewMode, setViewMode }) => {
+      const filteredData = useMemo(() => {
+        let daysToShow = dailyModelTokens.length;
+        if (timeRange === 'daily') daysToShow = 7;
+        else if (timeRange === 'weekly') daysToShow = 30;
+        return dailyModelTokens.slice(-daysToShow);
+      }, [dailyModelTokens, timeRange]);
+
+      const filteredActivity = useMemo(() => {
+        let daysToShow = dailyActivity.length;
+        if (timeRange === 'daily') daysToShow = 7;
+        else if (timeRange === 'weekly') daysToShow = 30;
+        return dailyActivity.slice(-daysToShow);
+      }, [dailyActivity, timeRange]);
+
+      const option = useMemo(() => {
+        if (viewMode === 'models') {
+          // By model view
+          const models = new Set();
+          filteredData.forEach(d => Object.keys(d.tokensByModel || {}).forEach(m => models.add(m)));
+
+          const series = Array.from(models).map(model => ({
+            name: getModelDisplayName(model),
+            type: 'line',
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 4,
+            lineStyle: { width: 2 },
+            itemStyle: { color: getModelColor(model) },
+            areaStyle: { opacity: 0.05 },
+            data: filteredData.map(d => (d.tokensByModel?.[model] || 0))
+          }));
+
+          return {
+            backgroundColor: 'transparent',
+            tooltip: {
+              trigger: 'axis',
+              backgroundColor: COLORS.surface2,
+              borderColor: COLORS.border,
+              textStyle: { color: COLORS.text },
+              formatter: (params) => {
+                let result = `<div style="font-weight:600;margin-bottom:8px">${params[0].axisValue}</div>`;
+                params.forEach(p => {
+                  result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                    <span style="width:8px;height:8px;border-radius:50%;background:${p.color}"></span>
+                    <span style="color:${COLORS.textSecondary}">${p.seriesName}:</span>
+                    <span style="font-weight:500">${formatNumber(p.value)}</span>
+                  </div>`;
+                });
+                return result;
+              }
+            },
+            legend: {
+              data: Array.from(models).map(getModelDisplayName),
+              textStyle: { color: COLORS.textMuted, fontSize: 11 },
+              bottom: 0
+            },
+            grid: { left: 55, right: 15, top: 15, bottom: 45 },
+            xAxis: {
+              type: 'category',
+              data: filteredData.map(d => new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
+              axisLine: { lineStyle: { color: COLORS.borderSubtle } },
+              axisLabel: { color: COLORS.textMuted, fontSize: 11 },
+              axisTick: { show: false }
+            },
+            yAxis: {
+              type: 'value',
+              axisLine: { show: false },
+              splitLine: { lineStyle: { color: COLORS.borderSubtle } },
+              axisLabel: { color: COLORS.textMuted, fontSize: 11, formatter: (v) => formatNumber(v) }
+            },
+            series
+          };
+        } else {
+          // By token type view (input/output/total)
+          const dates = filteredActivity.map(d => new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+
+          // We need to aggregate input/output from dailyModelTokens
+          const inputByDate = [];
+          const outputByDate = [];
+
+          // For now, we'll show message counts from dailyActivity and estimate based on typical ratios
+          // In a real scenario, you'd want the server to provide this breakdown
+          const messageData = filteredActivity.map(d => d.messageCount);
+
+          return {
+            backgroundColor: 'transparent',
+            tooltip: {
+              trigger: 'axis',
+              backgroundColor: COLORS.surface2,
+              borderColor: COLORS.border,
+              textStyle: { color: COLORS.text },
+              formatter: (params) => {
+                let result = `<div style="font-weight:600;margin-bottom:8px">${params[0].axisValue}</div>`;
+                params.forEach(p => {
+                  result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                    <span style="width:8px;height:8px;border-radius:50%;background:${p.color}"></span>
+                    <span style="color:${COLORS.textSecondary}">${p.seriesName}:</span>
+                    <span style="font-weight:500">${formatNumber(p.value)}</span>
+                  </div>`;
+                });
+                return result;
+              }
+            },
+            legend: {
+              data: ['Messages', 'Sessions'],
+              textStyle: { color: COLORS.textMuted, fontSize: 11 },
+              bottom: 0
+            },
+            grid: { left: 55, right: 15, top: 15, bottom: 45 },
+            xAxis: {
+              type: 'category',
+              data: dates,
+              axisLine: { lineStyle: { color: COLORS.borderSubtle } },
+              axisLabel: { color: COLORS.textMuted, fontSize: 11 },
+              axisTick: { show: false }
+            },
+            yAxis: {
+              type: 'value',
+              axisLine: { show: false },
+              splitLine: { lineStyle: { color: COLORS.borderSubtle } },
+              axisLabel: { color: COLORS.textMuted, fontSize: 11 }
+            },
+            series: [
+              {
+                name: 'Messages',
+                type: 'bar',
+                barWidth: '60%',
+                itemStyle: { color: COLORS.coral, borderRadius: [4, 4, 0, 0] },
+                data: messageData
+              },
+              {
+                name: 'Sessions',
+                type: 'line',
+                smooth: true,
+                symbol: 'circle',
+                symbolSize: 4,
+                lineStyle: { width: 2, color: COLORS.blue },
+                itemStyle: { color: COLORS.blue },
+                data: filteredActivity.map(d => d.sessionCount)
+              }
+            ]
+          };
+        }
+      }, [filteredData, filteredActivity, viewMode]);
+
+      return (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={() => setViewMode('models')}
+              className={`toggle-btn ${viewMode === 'models' ? 'toggle-btn-active' : 'toggle-btn-inactive'}`}
+            >
+              By Model
+            </button>
+            <button
+              onClick={() => setViewMode('activity')}
+              className={`toggle-btn ${viewMode === 'activity' ? 'toggle-btn-active' : 'toggle-btn-inactive'}`}
+            >
+              Activity
+            </button>
+          </div>
+          <Chart option={option} height={280} />
+        </div>
+      );
+    };
+
+    // Model Comparison Chart
+    const ModelComparison = ({ modelUsage }) => {
+      const option = useMemo(() => {
+        const models = Object.entries(modelUsage);
+        if (models.length === 0) return { series: [] };
+
+        const data = models.map(([model, usage]) => ({
+          name: getModelDisplayName(model),
+          model,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          total: usage.inputTokens + usage.outputTokens
+        })).sort((a, b) => b.total - a.total);
+
+        const maxValue = Math.max(...data.map(d => d.total), 1);
+
+        return {
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' },
+            backgroundColor: COLORS.surface2,
+            borderColor: COLORS.border,
+            textStyle: { color: COLORS.text },
+            formatter: (params) => {
+              const modelData = data[params[0].dataIndex];
+              return `<div style="font-weight:600;margin-bottom:8px">${modelData.name}</div>
+                <div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                  <span style="width:8px;height:8px;border-radius:2px;background:${COLORS.blue}"></span>
+                  <span style="color:${COLORS.textSecondary}">Input:</span> <span>${formatNumber(modelData.inputTokens)}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                  <span style="width:8px;height:8px;border-radius:2px;background:${COLORS.purple}"></span>
+                  <span style="color:${COLORS.textSecondary}">Output:</span> <span>${formatNumber(modelData.outputTokens)}</span>
+                </div>
+                <div style="border-top:1px solid ${COLORS.border};margin-top:8px;padding-top:8px;font-weight:600">
+                  Total: ${formatNumber(modelData.total)}
+                </div>`;
+            }
+          },
+          legend: {
+            data: ['Input', 'Output'],
+            textStyle: { color: COLORS.textMuted, fontSize: 11 },
+            right: 10,
+            top: 0
+          },
+          grid: { left: '22%', right: '12%', top: 30, bottom: 10, containLabel: false },
+          xAxis: {
+            type: 'value',
+            max: maxValue,
+            axisLine: { show: false },
+            splitLine: { lineStyle: { color: COLORS.borderSubtle } },
+            axisLabel: { color: COLORS.textMuted, fontSize: 11, formatter: (v) => formatNumber(v) }
+          },
+          yAxis: {
+            type: 'category',
+            data: data.map(d => d.name),
+            axisLine: { show: false },
+            axisTick: { show: false },
+            axisLabel: { color: COLORS.textSecondary, fontSize: 12 }
+          },
+          series: [
+            {
+              name: 'Input',
+              type: 'bar',
+              stack: 'total',
+              barWidth: 20,
+              itemStyle: { color: COLORS.blue },
+              data: data.map(d => d.inputTokens)
+            },
+            {
+              name: 'Output',
+              type: 'bar',
+              stack: 'total',
+              barWidth: 20,
+              itemStyle: { color: COLORS.purple, borderRadius: [0, 4, 4, 0] },
+              label: {
+                show: true,
+                position: 'right',
+                color: COLORS.textMuted,
+                fontSize: 10,
+                formatter: (p) => formatNumber(data[p.dataIndex].total)
+              },
+              data: data.map(d => d.outputTokens)
+            }
+          ]
+        };
+      }, [modelUsage]);
+
+      return <Chart option={option} height={140} />;
+    };
+
+    // Color palette for sessions (Anthropic-inspired)
+    const SESSION_COLORS = [
+      '#D97757', '#5B9DD9', '#5BBD72', '#E5A855', '#9D7CD8',
+      '#E88A8A', '#6BB3B3', '#B8A36E', '#7D8DC7', '#6BAD8A'
+    ];
+
+    // Session Timeline Chart (Token usage over time by session)
+    const SessionTimeline = ({ sessions, timeRange }) => {
+      const option = useMemo(() => {
+        const validSessions = sessions
+          .filter(s => s.totalTokens > 0 && s.lastActivity)
+          .sort((a, b) => new Date(a.lastActivity).getTime() - new Date(b.lastActivity).getTime());
+
+        if (validSessions.length === 0) return { series: [] };
+
+        // Filter by time range
+        const now = new Date();
+        let filteredSessions = validSessions;
+        if (timeRange === 'daily') {
+          const cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          filteredSessions = validSessions.filter(s => new Date(s.lastActivity) >= cutoff);
+        } else if (timeRange === 'weekly') {
+          const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          filteredSessions = validSessions.filter(s => new Date(s.lastActivity) >= cutoff);
+        }
+
+        if (filteredSessions.length === 0) filteredSessions = validSessions.slice(-15);
+
+        // Group sessions by project and aggregate by date
+        const projectMap = new Map();
+        filteredSessions.forEach(s => {
+          const projectName = s.project.split('/').pop() || 'Unknown';
+          if (!projectMap.has(projectName)) {
+            projectMap.set(projectName, []);
+          }
+          projectMap.get(projectName).push(s);
+        });
+
+        // Get top projects by total tokens
+        const topProjects = Array.from(projectMap.entries())
+          .map(([name, sessions]) => ({
+            name,
+            sessions,
+            totalTokens: sessions.reduce((sum, s) => sum + s.totalTokens, 0)
+          }))
+          .sort((a, b) => b.totalTokens - a.totalTokens)
+          .slice(0, 8);
+
+        // Get all unique dates
+        const allDates = new Set();
+        topProjects.forEach(p => {
+          p.sessions.forEach(s => {
+            const date = new Date(s.lastActivity).toDateString();
+            allDates.add(date);
+          });
+        });
+
+        const sortedDates = Array.from(allDates)
+          .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
+        // Create stacked bar series for each project
+        const series = topProjects.map((project, idx) => {
+          const color = SESSION_COLORS[idx % SESSION_COLORS.length];
+          const displayName = project.name.length > 12 ? project.name.slice(0, 10) + '...' : project.name;
+
+          // Sum tokens per date for this project
+          const tokensByDate = new Map();
+          project.sessions.forEach(s => {
+            const date = new Date(s.lastActivity).toDateString();
+            tokensByDate.set(date, (tokensByDate.get(date) || 0) + s.totalTokens);
+          });
+
+          const data = sortedDates.map(date => tokensByDate.get(date) || 0);
+
+          return {
+            name: displayName,
+            type: 'bar',
+            stack: 'total',
+            barMaxWidth: 40,
+            itemStyle: { color, borderRadius: idx === topProjects.length - 1 ? [4, 4, 0, 0] : 0 },
+            emphasis: { focus: 'series' },
+            data
+          };
+        });
+
+        return {
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' },
+            backgroundColor: 'hsl(240 6% 15%)',
+            borderColor: 'hsl(240 3.7% 20%)',
+            textStyle: { color: '#fff' },
+            formatter: (params) => {
+              let result = `<div style="font-weight:600;margin-bottom:8px">${params[0].axisValue}</div>`;
+              let total = 0;
+              params.filter(p => p.value > 0).forEach(p => {
+                total += p.value;
+                result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                  <span style="width:10px;height:10px;border-radius:2px;background:${p.color}"></span>
+                  <span>${p.seriesName}: ${formatNumber(p.value)}</span>
+                </div>`;
+              });
+              if (total > 0) {
+                result += `<div style="border-top:1px solid #444;margin-top:8px;padding-top:8px;font-weight:600">Total: ${formatNumber(total)}</div>`;
+              }
+              return result;
+            }
+          },
+          legend: {
+            data: series.map(s => s.name),
+            textStyle: { color: '#888', fontSize: 11 },
+            bottom: 0,
+            type: 'scroll'
+          },
+          grid: { left: 50, right: 20, top: 20, bottom: 60 },
+          xAxis: {
+            type: 'category',
+            data: sortedDates.map(d => {
+              const date = new Date(d);
+              return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }),
+            axisLine: { lineStyle: { color: '#333' } },
+            axisLabel: { color: '#666' }
+          },
+          yAxis: {
+            type: 'value',
+            axisLine: { show: false },
+            splitLine: { lineStyle: { color: '#222' } },
+            axisLabel: { color: '#666', formatter: (v) => formatNumber(v) }
+          },
+          series
+        };
+      }, [sessions, timeRange]);
+
+      return <Chart option={option} height={280} />;
+    };
+
+    // Session Race Chart - Shows sessions growing over time
+    const SessionRace = ({ sessions, viewMode, setViewMode }) => {
+      const option = useMemo(() => {
+        // Get recent sessions with activity
+        const recentSessions = sessions
+          .filter(s => s.totalTokens > 0 && s.startTime && s.lastActivity)
+          .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())
+          .slice(0, 8);
+
+        if (recentSessions.length === 0) return { series: [] };
+
+        if (viewMode === 'bar') {
+          // Bar chart view - horizontal bars showing total tokens per session
+          const sortedSessions = [...recentSessions].sort((a, b) => a.totalTokens - b.totalTokens);
+
+          const data = sortedSessions.map((session, idx) => {
+            const projectName = session.project.split('/').pop() || 'Unknown';
+            const displayName = projectName.length > 15 ? projectName.slice(0, 13) + '...' : projectName;
+            const color = SESSION_COLORS[idx % SESSION_COLORS.length];
+
+            return {
+              name: displayName,
+              value: session.totalTokens,
+              itemStyle: {
+                color,
+                borderRadius: [0, 4, 4, 0]
+              },
+              session
+            };
+          });
+
+          return {
+            backgroundColor: 'transparent',
+            tooltip: {
+              trigger: 'item',
+              backgroundColor: COLORS.surface2,
+              borderColor: COLORS.border,
+              textStyle: { color: COLORS.text },
+              formatter: (params) => {
+                const s = params.data.session;
+                const date = new Date(s.lastActivity).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                return `<div style="font-weight:600;margin-bottom:8px">${params.name}</div>
+                  <div style="color:${COLORS.textSecondary};margin-bottom:4px">${date}</div>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="width:8px;height:8px;border-radius:50%;background:${params.color}"></span>
+                    <span>Total: <b>${formatNumber(params.value)}</b> tokens</span>
+                  </div>
+                  <div style="margin-top:4px;color:${COLORS.textMuted};font-size:11px">
+                    ${s.messageCount} messages • ${s.model ? getModelDisplayName(s.model) : 'Unknown'}
+                  </div>`;
+              }
+            },
+            grid: { left: 100, right: 30, top: 10, bottom: 20 },
+            xAxis: {
+              type: 'value',
+              axisLine: { show: false },
+              splitLine: { lineStyle: { color: COLORS.borderSubtle } },
+              axisLabel: { color: COLORS.textMuted, fontSize: 10, formatter: (v) => formatNumber(v) }
+            },
+            yAxis: {
+              type: 'category',
+              data: data.map(d => d.name),
+              axisLine: { show: false },
+              axisTick: { show: false },
+              axisLabel: { color: COLORS.textSecondary, fontSize: 11 }
+            },
+            series: [{
+              type: 'bar',
+              data: data,
+              barWidth: '60%',
+              label: {
+                show: true,
+                position: 'right',
+                formatter: (params) => formatNumber(params.value),
+                fontSize: 10,
+                color: COLORS.textMuted
+              }
+            }]
+          };
+        }
+
+        // Race view (default) - animated line chart
+        // Find the time range
+        const allTimes = recentSessions.flatMap(s => [new Date(s.startTime).getTime(), new Date(s.lastActivity).getTime()]);
+        const minTime = Math.min(...allTimes);
+        const maxTime = Math.max(...allTimes);
+        const timeRange = maxTime - minTime;
+
+        // Create time points (normalize to 0-100 scale for x-axis)
+        const numPoints = 50;
+        const timePoints = Array.from({ length: numPoints + 1 }, (_, i) => {
+          const t = minTime + (timeRange * i / numPoints);
+          return new Date(t);
+        });
+
+        // Create series for each session
+        const series = recentSessions.slice(0, 6).map((session, idx) => {
+          const color = SESSION_COLORS[idx % SESSION_COLORS.length];
+          const projectName = session.project.split('/').pop() || 'Unknown';
+          const displayName = projectName.length > 12 ? projectName.slice(0, 10) + '...' : projectName;
+
+          const startTime = new Date(session.startTime).getTime();
+          const endTime = new Date(session.lastActivity).getTime();
+          const duration = endTime - startTime;
+
+          // Create cumulative growth data
+          const data = timePoints.map(tp => {
+            const t = tp.getTime();
+            if (t < startTime) return null;
+            if (t >= endTime) return session.totalTokens;
+            // Linear interpolation for growth
+            const progress = (t - startTime) / duration;
+            // Use easeOutQuad for more natural growth curve
+            const eased = 1 - Math.pow(1 - progress, 2);
+            return Math.round(session.totalTokens * eased);
+          });
+
+          return {
+            name: displayName,
+            type: 'line',
+            smooth: true,
+            symbol: 'none',
+            lineStyle: { width: 2, color },
+            itemStyle: { color },
+            areaStyle: { opacity: 0.05, color },
+            connectNulls: false,
+            data,
+            endLabel: {
+              show: true,
+              formatter: '{a}',
+              fontSize: 10,
+              color: color,
+              distance: 8
+            }
+          };
+        });
+
+        return {
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'axis',
+            backgroundColor: 'hsl(240 6% 15%)',
+            borderColor: 'hsl(240 3.7% 20%)',
+            textStyle: { color: '#fff' },
+            formatter: (params) => {
+              const validParams = params.filter(p => p.value !== null);
+              if (validParams.length === 0) return '';
+              let result = `<div style="font-weight:600;margin-bottom:8px">${params[0].axisValueLabel}</div>`;
+              validParams.sort((a, b) => b.value - a.value).forEach(p => {
+                result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                  <span style="width:10px;height:10px;border-radius:50%;background:${p.color}"></span>
+                  <span>${p.seriesName}: ${formatNumber(p.value)}</span>
+                </div>`;
+              });
+              return result;
+            }
+          },
+          grid: { left: 50, right: 100, top: 20, bottom: 30 },
+          xAxis: {
+            type: 'category',
+            data: timePoints.map(d => d.toLocaleTimeString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })),
+            axisLine: { lineStyle: { color: '#333' } },
+            axisLabel: {
+              color: '#666',
+              fontSize: 10,
+              interval: Math.floor(numPoints / 5),
+              formatter: (value, idx) => {
+                if (idx === 0 || idx === numPoints) {
+                  return value.split(',')[0]; // Just show date part
+                }
+                return '';
+              }
+            },
+            axisTick: { show: false }
+          },
+          yAxis: {
+            type: 'value',
+            axisLine: { show: false },
+            splitLine: { lineStyle: { color: '#222' } },
+            axisLabel: { color: '#666', formatter: (v) => formatNumber(v) }
+          },
+          series
+        };
+      }, [sessions, viewMode]);
+
+      return (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={() => setViewMode('race')}
+              className={`toggle-btn ${viewMode === 'race' ? 'toggle-btn-active' : 'toggle-btn-inactive'}`}
+            >
+              Race
+            </button>
+            <button
+              onClick={() => setViewMode('bar')}
+              className={`toggle-btn ${viewMode === 'bar' ? 'toggle-btn-active' : 'toggle-btn-inactive'}`}
+            >
+              Bar
+            </button>
+          </div>
+          <Chart option={option} height={220} />
+        </div>
+      );
+    };
+
+    // Current Session Chart - Line chart showing input/output/total over time
+    const CurrentSession = ({ session }) => {
+      const option = useMemo(() => {
+        if (!session || !session.tokenTimeline || session.tokenTimeline.length === 0) {
+          return {
+            backgroundColor: 'transparent',
+            graphic: {
+              type: 'text',
+              left: 'center',
+              top: 'middle',
+              style: {
+                text: session ? 'No timeline data' : 'No active session',
+                fill: '#666',
+                fontSize: 14
+              }
+            }
+          };
+        }
+
+        const timeline = session.tokenTimeline;
+
+        // Format timestamps as day:hour
+        const formatTime = (ts) => {
+          const d = new Date(ts);
+          return d.toLocaleTimeString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        };
+
+        return {
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'axis',
+            backgroundColor: '#1f1f2e',
+            borderColor: '#333',
+            textStyle: { color: '#fff' },
+            formatter: (params) => {
+              let result = `<div style="font-weight:600;margin-bottom:8px">${params[0].axisValue}</div>`;
+              params.forEach(p => {
+                result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                  <span style="width:10px;height:10px;border-radius:50%;background:${p.color}"></span>
+                  <span>${p.seriesName}: ${formatNumber(p.value)}</span>
+                </div>`;
+              });
+              return result;
+            }
+          },
+          legend: {
+            data: ['Total', 'Output', 'Input'],
+            textStyle: { color: '#888', fontSize: 10 },
+            bottom: 0,
+            itemWidth: 12,
+            itemHeight: 8
+          },
+          grid: { left: 50, right: 15, top: 15, bottom: 35 },
+          xAxis: {
+            type: 'category',
+            data: timeline.map(t => formatTime(t.timestamp)),
+            axisLine: { lineStyle: { color: '#333' } },
+            axisLabel: {
+              color: '#666',
+              fontSize: 9,
+              interval: Math.max(0, Math.floor(timeline.length / 5) - 1),
+              rotate: 0
+            },
+            axisTick: { show: false }
+          },
+          yAxis: {
+            type: 'value',
+            axisLine: { show: false },
+            splitLine: { lineStyle: { color: '#222' } },
+            axisLabel: { color: '#666', fontSize: 10, formatter: (v) => formatNumber(v) }
+          },
+          series: [
+            {
+              name: 'Total',
+              type: 'line',
+              smooth: true,
+              symbol: 'none',
+              lineStyle: { width: 2, color: '#f59e0b' },
+              areaStyle: { opacity: 0.05, color: '#f59e0b' },
+              data: timeline.map(t => t.totalTokens)
+            },
+            {
+              name: 'Output',
+              type: 'line',
+              smooth: true,
+              symbol: 'none',
+              lineStyle: { width: 2, color: '#8b5cf6' },
+              data: timeline.map(t => t.outputTokens)
+            },
+            {
+              name: 'Input',
+              type: 'line',
+              smooth: true,
+              symbol: 'none',
+              lineStyle: { width: 2, color: '#06b6d4' },
+              data: timeline.map(t => t.inputTokens)
+            }
+          ]
+        };
+      }, [session]);
+
+      const projectName = session?.project.split('/').pop() || 'No session';
+
+      return (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-gray-400 truncate">{projectName}</span>
+            {session && (
+              <span className="text-xs text-emerald-400 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse" />
+                Live
+              </span>
+            )}
+          </div>
+          {session && (
+            <div className="flex gap-4 text-xs text-gray-500 mb-2">
+              <span>{session.messageCount} messages</span>
+              <span>{getModelDisplayName(session.model)}</span>
+            </div>
+          )}
+          <Chart option={option} height={220} />
+        </div>
+      );
+    };
+
+    // Peak Hours Heatmap
+    const PeakHours = ({ hourlyActivity }) => {
+      const option = useMemo(() => {
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const hours = Array.from({ length: 24 }, (_, i) => i);
+
+        // Build the data matrix [hour, day, count]
+        const dataMap = new Map();
+        let maxCount = 1;
+
+        hourlyActivity.forEach(({ day, hour, count }) => {
+          const key = `${hour}-${day}`;
+          dataMap.set(key, (dataMap.get(key) || 0) + count);
+          maxCount = Math.max(maxCount, dataMap.get(key));
+        });
+
+        // Create full grid with all cells
+        const data = [];
+        for (let h = 0; h < 24; h++) {
+          for (let d = 0; d < 7; d++) {
+            const key = `${h}-${d}`;
+            const count = dataMap.get(key) || 0;
+            data.push([h, d, count]);
+          }
+        }
+
+        return {
+          backgroundColor: 'transparent',
+          tooltip: {
+            position: 'top',
+            backgroundColor: '#1f1f2e',
+            borderColor: '#333',
+            textStyle: { color: '#fff' },
+            formatter: (params) => {
+              const [hour, day, count] = params.data;
+              return `<div style="font-weight:600">${days[day]} ${hour}:00</div><div>${count} messages</div>`;
+            }
+          },
+          grid: { left: 45, right: 10, top: 10, bottom: 30 },
+          xAxis: {
+            type: 'category',
+            data: hours,
+            splitArea: { show: false },
+            axisLine: { show: false },
+            axisTick: { show: false },
+            axisLabel: {
+              color: '#666',
+              fontSize: 9,
+              interval: 2,
+              formatter: (v) => `${v}h`
+            }
+          },
+          yAxis: {
+            type: 'category',
+            data: days,
+            splitArea: { show: false },
+            axisLine: { show: false },
+            axisTick: { show: false },
+            axisLabel: { color: '#888', fontSize: 10 }
+          },
+          visualMap: {
+            min: 0,
+            max: maxCount,
+            calculable: false,
+            show: false,
+            inRange: {
+              color: ['#1a1a2e', '#2d2b55', '#4c3d8f', '#6b4fd4', '#8b5cf6']
+            }
+          },
+          series: [{
+            type: 'heatmap',
+            data: data,
+            itemStyle: {
+              borderColor: '#0d0d14',
+              borderWidth: 2,
+              borderRadius: 3
+            },
+            emphasis: {
+              itemStyle: { borderColor: '#8b5cf6', borderWidth: 2 }
+            }
+          }]
+        };
+      }, [hourlyActivity]);
+
+      return <Chart option={option} height={200} />;
+    };
+
+    // Project Cost Chart
+    const ProjectCost = ({ sessions }) => {
+      const option = useMemo(() => {
+        // Aggregate cost by project
+        const projectCosts = new Map();
+        sessions.forEach(s => {
+          const projectName = s.project.split('/').pop() || 'Unknown';
+          projectCosts.set(projectName, (projectCosts.get(projectName) || 0) + s.costUSD);
+        });
+
+        // Sort by cost and take top 8
+        const sortedProjects = Array.from(projectCosts.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8);
+
+        if (sortedProjects.length === 0) return { series: [] };
+
+        const maxCost = Math.max(...sortedProjects.map(([_, cost]) => cost), 0.01);
+
+        return {
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' },
+            backgroundColor: 'hsl(240 6% 15%)',
+            borderColor: 'hsl(240 3.7% 20%)',
+            textStyle: { color: '#fff' },
+            formatter: (params) => {
+              return `<div style="font-weight:600;margin-bottom:4px">${params[0].name}</div>
+                <div>${formatCurrency(params[0].value)}</div>`;
+            }
+          },
+          grid: { left: '30%', right: '15%', top: 10, bottom: 10, containLabel: false },
+          xAxis: {
+            type: 'value',
+            max: maxCost,
+            axisLine: { show: false },
+            splitLine: { lineStyle: { color: '#222' } },
+            axisLabel: { color: '#666', formatter: (v) => formatCurrency(v) }
+          },
+          yAxis: {
+            type: 'category',
+            data: sortedProjects.map(([name]) => name.length > 15 ? name.slice(0, 12) + '...' : name),
+            axisLine: { show: false },
+            axisTick: { show: false },
+            axisLabel: { color: '#999', fontSize: 11 }
+          },
+          series: [{
+            type: 'bar',
+            barWidth: 16,
+            itemStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                { offset: 0, color: '#22c55e' },
+                { offset: 1, color: '#06b6d4' }
+              ]),
+              borderRadius: [0, 4, 4, 0]
+            },
+            label: {
+              show: true,
+              position: 'right',
+              color: '#888',
+              fontSize: 10,
+              formatter: (p) => formatCurrency(p.value)
+            },
+            data: sortedProjects.map(([_, cost]) => cost)
+          }]
+        };
+      }, [sessions]);
+
+      return <Chart option={option} height={200} />;
+    };
+
+    // Session Progression Modal - Shows full progression chart for a project's sessions
+    const SessionProgressionModal = ({ sessions, projectName, onClose }) => {
+      const [selectedMessageIndex, setSelectedMessageIndex] = useState(null);
+
+      // Filter sessions with timeline data
+      const sessionsWithTimeline = useMemo(() => {
+        return (sessions || []).filter(s => s.tokenTimeline && s.tokenTimeline.length > 1);
+      }, [sessions]);
+
+      const [selectedSessionId, setSelectedSessionId] = useState(null);
+
+      // Auto-select first session with timeline
+      useEffect(() => {
+        if (!selectedSessionId && sessionsWithTimeline.length > 0) {
+          const current = sessionsWithTimeline.find(s => s.isCurrentSession);
+          setSelectedSessionId(current?.sessionId || sessionsWithTimeline[0].sessionId);
+        }
+      }, [sessionsWithTimeline, selectedSessionId]);
+
+      const session = useMemo(() => {
+        return sessionsWithTimeline.find(s => s.sessionId === selectedSessionId);
+      }, [sessionsWithTimeline, selectedSessionId]);
+
+      const timeline = session?.tokenTimeline || [];
+
+      const handleModalClose = useCallback((newIndex) => {
+        if (typeof newIndex === 'number') {
+          if (newIndex >= 0 && newIndex < timeline.length) {
+            setSelectedMessageIndex(newIndex);
+          } else {
+            setSelectedMessageIndex(null);
+          }
+        } else {
+          setSelectedMessageIndex(null);
+        }
+      }, [timeline.length]);
+
+      // Calculate deltas for all messages
+      const deltas = useMemo(() => {
+        if (!timeline.length) return [];
+        return timeline.map((point, i) => {
+          const prev = i > 0 ? timeline[i - 1] : { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+          return {
+            input: point.inputTokens - prev.inputTokens,
+            output: point.outputTokens - prev.outputTokens,
+            total: point.totalTokens - prev.totalTokens
+          };
+        });
+      }, [timeline]);
+
+      const chartOption = useMemo(() => {
+        if (!timeline.length) {
+          return {
+            backgroundColor: 'transparent',
+            graphic: {
+              type: 'text',
+              left: 'center',
+              top: 'middle',
+              style: { text: 'No timeline data available for this session', fill: COLORS.textMuted, fontSize: 14 }
+            }
+          };
+        }
+
+        return {
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'axis',
+            backgroundColor: COLORS.surface2,
+            borderColor: COLORS.border,
+            textStyle: { color: COLORS.text },
+            formatter: (params) => {
+              const idx = params[0].dataIndex;
+              const point = timeline[idx];
+              const delta = deltas[idx];
+              const time = new Date(point.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+              let result = `<div style="font-weight:600;margin-bottom:8px">Message ${idx + 1} <span style="color:${COLORS.textMuted};font-weight:400">${time}</span></div>`;
+              result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                <span style="width:8px;height:8px;border-radius:50%;background:${COLORS.amber}"></span>
+                <span style="color:${COLORS.textSecondary}">Total:</span>
+                <span style="font-weight:500">${formatNumber(point.totalTokens)}</span>
+                <span style="color:${COLORS.textMuted}">(+${formatNumber(delta.total)})</span>
+              </div>`;
+              result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                <span style="width:8px;height:8px;border-radius:50%;background:${COLORS.purple}"></span>
+                <span style="color:${COLORS.textSecondary}">Output:</span>
+                <span style="font-weight:500">${formatNumber(point.outputTokens)}</span>
+                <span style="color:${COLORS.textMuted}">(+${formatNumber(delta.output)})</span>
+              </div>`;
+              result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                <span style="width:8px;height:8px;border-radius:50%;background:${COLORS.blue}"></span>
+                <span style="color:${COLORS.textSecondary}">Input:</span>
+                <span style="font-weight:500">${formatNumber(point.inputTokens)}</span>
+                <span style="color:${COLORS.textMuted}">(+${formatNumber(delta.input)})</span>
+              </div>`;
+              result += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid ${COLORS.border};font-size:11px;color:${COLORS.textMuted}">Click for details</div>`;
+              return result;
+            }
+          },
+          legend: {
+            data: ['Total', 'Output', 'Input'],
+            textStyle: { color: COLORS.textMuted, fontSize: 11 },
+            bottom: 0
+          },
+          grid: { left: 55, right: 20, top: 20, bottom: 45 },
+          xAxis: {
+            type: 'category',
+            data: timeline.map((_, i) => `#${i + 1}`),
+            axisLine: { lineStyle: { color: COLORS.borderSubtle } },
+            axisLabel: { color: COLORS.textMuted, fontSize: 10, interval: Math.max(0, Math.floor(timeline.length / 12) - 1) },
+            axisTick: { show: false }
+          },
+          yAxis: {
+            type: 'value',
+            axisLine: { show: false },
+            splitLine: { lineStyle: { color: COLORS.borderSubtle } },
+            axisLabel: { color: COLORS.textMuted, fontSize: 10, formatter: (v) => formatNumber(v) }
+          },
+          series: [
+            {
+              name: 'Total',
+              type: 'line',
+              smooth: true,
+              symbol: 'circle',
+              symbolSize: 6,
+              showSymbol: timeline.length < 60,
+              lineStyle: { width: 2, color: COLORS.amber },
+              itemStyle: { color: COLORS.amber },
+              areaStyle: { opacity: 0.1, color: COLORS.amber },
+              emphasis: { scale: true, itemStyle: { color: COLORS.coral, borderColor: '#fff', borderWidth: 2 } },
+              data: timeline.map(t => t.totalTokens)
+            },
+            {
+              name: 'Output',
+              type: 'line',
+              smooth: true,
+              symbol: 'circle',
+              symbolSize: 4,
+              showSymbol: timeline.length < 60,
+              lineStyle: { width: 2, color: COLORS.purple },
+              itemStyle: { color: COLORS.purple },
+              emphasis: { scale: true, itemStyle: { borderColor: '#fff', borderWidth: 2 } },
+              data: timeline.map(t => t.outputTokens)
+            },
+            {
+              name: 'Input',
+              type: 'line',
+              smooth: true,
+              symbol: 'circle',
+              symbolSize: 4,
+              showSymbol: timeline.length < 60,
+              lineStyle: { width: 2, color: COLORS.blue },
+              itemStyle: { color: COLORS.blue },
+              emphasis: { scale: true, itemStyle: { borderColor: '#fff', borderWidth: 2 } },
+              data: timeline.map(t => t.inputTokens)
+            }
+          ]
+        };
+      }, [timeline, deltas]);
+
+      const handleChartClick = useCallback((params) => {
+        if (params.dataIndex !== undefined) {
+          setSelectedMessageIndex(params.dataIndex);
+        }
+      }, []);
+
+      if (sessionsWithTimeline.length === 0) {
+        return (
+          <div className="text-center py-12">
+            <div className="mb-4" style={{ color: COLORS.textMuted }}>{Icons.barChart}</div>
+            <p style={{ color: COLORS.textMuted }}>No timeline data available for this project</p>
+          </div>
+        );
+      }
+
+      const startTime = session ? new Date(session.startTime) : new Date();
+      const endTime = session ? new Date(session.lastActivity) : new Date();
+      const duration = endTime.getTime() - startTime.getTime();
+      const durationMins = Math.round(duration / 60000);
+
+      // Calculate project totals
+      const projectTotals = useMemo(() => {
+        return sessions.reduce((acc, s) => ({
+          totalTokens: acc.totalTokens + s.totalTokens,
+          inputTokens: acc.inputTokens + s.inputTokens,
+          outputTokens: acc.outputTokens + s.outputTokens,
+          messageCount: acc.messageCount + s.messageCount
+        }), { totalTokens: 0, inputTokens: 0, outputTokens: 0, messageCount: 0 });
+      }, [sessions]);
+
+      return (
+        <div>
+          {/* Project Header */}
+          <div className="mb-6 pr-8">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-xl font-bold" style={{ color: COLORS.coral }}>{projectName}</span>
+              <span className="px-2 py-1 rounded text-xs" style={{ background: COLORS.surface3, color: COLORS.textSecondary }}>
+                {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="text-sm" style={{ color: COLORS.textMuted }}>
+              {formatNumber(projectTotals.totalTokens)} total tokens • {projectTotals.messageCount} messages
+            </div>
+          </div>
+
+          {/* Session Selector */}
+          {sessionsWithTimeline.length > 1 && (
+            <div className="mb-4">
+              <label className="text-xs uppercase tracking-wider mb-2 block" style={{ color: COLORS.textMuted }}>
+                Select Session
+              </label>
+              <select
+                value={selectedSessionId || ''}
+                onChange={(e) => setSelectedSessionId(e.target.value)}
+                className="w-full text-sm px-3 py-2 rounded-lg border appearance-none cursor-pointer"
+                style={{
+                  background: COLORS.surface2,
+                  borderColor: COLORS.border,
+                  color: COLORS.text
+                }}
+              >
+                {sessionsWithTimeline.map(s => {
+                  const date = new Date(s.lastActivity).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                  return (
+                    <option key={s.sessionId} value={s.sessionId}>
+                      {s.sessionId.slice(0, 8)}... • {date} • {s.tokenTimeline?.length || 0} msgs • {formatNumber(s.totalTokens)} tokens
+                      {s.isCurrentSession ? ' ★ Active' : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
+
+          {session && (
+            <>
+              {/* Session Info */}
+              <div className="flex items-center gap-4 mb-4 p-3 rounded-lg" style={{ background: COLORS.surface2 }}>
+                <span className="w-3 h-3 rounded-full" style={{ background: getModelColor(session.model) }}></span>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm" style={{ color: COLORS.text }}>{getModelDisplayName(session.model)}</span>
+                    {session.isCurrentSession && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs" style={{ background: COLORS.green + '20', color: COLORS.green }}>
+                        <span className="w-1.5 h-1.5 rounded-full pulse" style={{ background: COLORS.green }} />
+                        Live
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs" style={{ color: COLORS.textMuted }}>
+                    {startTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • {durationMins > 60 ? `${Math.round(durationMins / 60)}h ${durationMins % 60}m` : `${durationMins}m`}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold" style={{ color: COLORS.amber }}>{formatNumber(session.totalTokens)}</div>
+                  <div className="text-xs" style={{ color: COLORS.textMuted }}>{session.messageCount} messages</div>
+                </div>
+              </div>
+
+              {/* Stats Row */}
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="p-3 rounded-lg text-center" style={{ background: COLORS.surface2 }}>
+                  <div className="text-xs uppercase tracking-wider mb-1" style={{ color: COLORS.textMuted }}>Total</div>
+                  <div className="text-lg font-bold" style={{ color: COLORS.amber }}>{formatNumber(session.totalTokens)}</div>
+                </div>
+                <div className="p-3 rounded-lg text-center" style={{ background: COLORS.surface2 }}>
+                  <div className="text-xs uppercase tracking-wider mb-1" style={{ color: COLORS.textMuted }}>Input</div>
+                  <div className="text-lg font-bold" style={{ color: COLORS.blue }}>{formatNumber(session.inputTokens)}</div>
+                </div>
+                <div className="p-3 rounded-lg text-center" style={{ background: COLORS.surface2 }}>
+                  <div className="text-xs uppercase tracking-wider mb-1" style={{ color: COLORS.textMuted }}>Output</div>
+                  <div className="text-lg font-bold" style={{ color: COLORS.purple }}>{formatNumber(session.outputTokens)}</div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Chart */}
+          {session && timeline.length > 0 && (
+            <div className="p-4 rounded-lg mb-4" style={{ background: COLORS.surface2 }}>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-medium" style={{ color: COLORS.text }}>Token Progression</h4>
+                <span className="text-xs" style={{ color: COLORS.textMuted }}>
+                  💡 Click any point for details
+                </span>
+              </div>
+              <Chart option={chartOption} height={280} onClick={handleChartClick} />
+            </div>
+          )}
+
+          {/* Message details modal */}
+          {selectedMessageIndex !== null && session && timeline.length > 0 && (
+            <Modal isOpen={true} onClose={() => setSelectedMessageIndex(null)}>
+              <MessageSectionDetail
+                session={session}
+                selectedIndex={selectedMessageIndex}
+                timeline={timeline}
+                onClose={handleModalClose}
+              />
+            </Modal>
+          )}
+        </div>
+      );
+    };
+
+    // Session List
+    const SessionList = ({ sessions, onProjectClick, onSessionClick }) => {
+      const [expanded, setExpanded] = useState(new Set());
+
+      const toggleExpand = (id, e) => {
+        e.stopPropagation();
+        const next = new Set(expanded);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setExpanded(next);
+      };
+
+      const projectGroups = useMemo(() => {
+        const groups = new Map();
+        sessions.forEach(session => {
+          const project = session.project || 'Unknown';
+          if (!groups.has(project)) groups.set(project, []);
+          groups.get(project).push(session);
+        });
+        return Array.from(groups.entries())
+          .sort((a, b) => {
+            const aLatest = Math.max(...a[1].map(s => new Date(s.lastActivity).getTime()));
+            const bLatest = Math.max(...b[1].map(s => new Date(s.lastActivity).getTime()));
+            return bLatest - aLatest;
+          });
+      }, [sessions]);
+
+      return (
+        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+          {projectGroups.slice(0, 10).map(([project, projectSessions]) => {
+            const isExpanded = expanded.has(project);
+            const totalTokens = projectSessions.reduce((sum, s) => sum + s.totalTokens, 0);
+            const latestSession = projectSessions[0];
+            const projectName = project.split('/').pop() || project;
+            // Get sessions with timeline data for this project
+            const sessionsWithTimeline = projectSessions.filter(s => s.tokenTimeline && s.tokenTimeline.length > 1);
+
+            return (
+              <div key={project} className="card overflow-hidden">
+                <div className="session-item w-full px-4 py-3 flex items-center justify-between text-left transition-colors">
+                  <div className="flex items-center gap-3 flex-1">
+                    {/* Chart button on the left */}
+                    {sessionsWithTimeline.length > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onProjectClick?.(projectSessions, projectName);
+                        }}
+                        className="p-1.5 rounded-lg transition-all hover:scale-110"
+                        style={{ background: COLORS.coral + '20', color: COLORS.coral }}
+                        title="View token progression"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>
+                        </svg>
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => toggleExpand(project, e)}
+                      className="flex items-center gap-3"
+                    >
+                      <span className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`} style={{ color: COLORS.textMuted }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M9 18l6-6-6-6"/>
+                        </svg>
+                      </span>
+                      <div className="text-left">
+                        <div className="font-medium" style={{ color: COLORS.text }}>{projectName}</div>
+                        {latestSession.branch && (
+                          <div className="text-xs" style={{ color: COLORS.textMuted }}>{latestSession.branch}</div>
+                        )}
+                      </div>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <span style={{ color: COLORS.textMuted }}>{formatRelativeTime(latestSession.lastActivity)}</span>
+                    <span className="font-mono px-2 py-1 rounded text-xs" style={{ background: COLORS.surface3, color: COLORS.text }}>
+                      {formatNumber(totalTokens)}
+                    </span>
+                  </div>
+                </div>
+
+                {isExpanded && (
+                  <div className="border-t bg-black/20" style={{ borderColor: COLORS.borderSubtle }}>
+                    {projectSessions.map(session => (
+                      <div
+                        key={session.sessionId}
+                        onClick={() => onSessionClick?.(session.sessionId)}
+                        className="px-4 py-3 pl-12 flex items-center justify-between text-sm border-b last:border-0 cursor-pointer transition-colors hover:bg-white/5 group"
+                        style={{ borderColor: COLORS.borderSubtle + '50' }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: getModelColor(session.model) }} />
+                          <div>
+                            <div className="font-mono text-xs" style={{ color: COLORS.textSecondary }}>{session.sessionId.slice(0, 8)}...</div>
+                            <div className="text-xs" style={{ color: COLORS.textMuted }}>
+                              {session.messageCount} messages • {getModelDisplayName(session.model)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs" style={{ color: COLORS.textMuted }}>{formatRelativeTime(session.lastActivity)}</span>
+                          <span className="font-mono text-xs" style={{ color: COLORS.textSecondary }}>{formatNumber(session.totalTokens)}</span>
+                          <span
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            style={{ color: COLORS.coral }}
+                            title="View message details"
+                          >
+                            {Icons.externalLink}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    // Section Header Component
+    const SectionHeader = ({ icon, title, description }) => (
+      <div className="section-header">
+        <span className="text-violet-400">{icon}</span>
+        <div>
+          <h2 className="section-title">{title}</h2>
+          {description && <p className="section-desc">{description}</p>}
+        </div>
+      </div>
+    );
+
+    // Message Section Detail Component
+    const MessageSectionDetail = ({ session, selectedIndex, timeline, onClose }) => {
+      const point = timeline[selectedIndex];
+      const prevPoint = selectedIndex > 0 ? timeline[selectedIndex - 1] : { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+
+      const inputDelta = point.inputTokens - prevPoint.inputTokens;
+      const outputDelta = point.outputTokens - prevPoint.outputTokens;
+      const totalDelta = point.totalTokens - prevPoint.totalTokens;
+
+      // Calculate context window size for this section
+      const contextStart = Math.max(0, selectedIndex - 5);
+      const contextEnd = Math.min(timeline.length - 1, selectedIndex + 5);
+      const contextData = timeline.slice(contextStart, contextEnd + 1);
+
+      // Mini chart for context around this message
+      const contextChartOption = useMemo(() => ({
+        backgroundColor: 'transparent',
+        tooltip: { trigger: 'axis' },
+        grid: { left: 50, right: 20, top: 20, bottom: 30 },
+        xAxis: {
+          type: 'category',
+          data: contextData.map((_, i) => `#${contextStart + i + 1}`),
+          axisLine: { lineStyle: { color: COLORS.borderSubtle } },
+          axisLabel: { color: COLORS.textMuted, fontSize: 10 }
+        },
+        yAxis: {
+          type: 'value',
+          axisLine: { show: false },
+          splitLine: { lineStyle: { color: COLORS.borderSubtle } },
+          axisLabel: { color: COLORS.textMuted, fontSize: 10, formatter: (v) => formatNumber(v) }
+        },
+        series: [
+          {
+            name: 'Total',
+            type: 'line',
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: (value, params) => params.dataIndex === (selectedIndex - contextStart) ? 10 : 4,
+            lineStyle: { width: 2, color: COLORS.amber },
+            itemStyle: {
+              color: (params) => params.dataIndex === (selectedIndex - contextStart) ? COLORS.coral : COLORS.amber
+            },
+            data: contextData.map(t => t.totalTokens),
+            markPoint: {
+              data: [{ coord: [selectedIndex - contextStart, point.totalTokens], symbolSize: 12 }],
+              itemStyle: { color: COLORS.coral }
+            }
+          },
+          {
+            name: 'Output',
+            type: 'line',
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 3,
+            lineStyle: { width: 2, color: COLORS.purple },
+            itemStyle: { color: COLORS.purple },
+            data: contextData.map(t => t.outputTokens)
+          },
+          {
+            name: 'Input',
+            type: 'line',
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 3,
+            lineStyle: { width: 2, color: COLORS.blue },
+            itemStyle: { color: COLORS.blue },
+            data: contextData.map(t => t.inputTokens)
+          }
+        ]
+      }), [contextData, selectedIndex, contextStart, point]);
+
+      // Bar chart for token breakdown at this message
+      const breakdownChartOption = useMemo(() => ({
+        backgroundColor: 'transparent',
+        tooltip: {
+          trigger: 'axis',
+          backgroundColor: COLORS.surface2,
+          borderColor: COLORS.border,
+          textStyle: { color: COLORS.text }
+        },
+        grid: { left: 20, right: 20, top: 20, bottom: 30, containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: ['This Message', 'Cumulative'],
+          axisLine: { lineStyle: { color: COLORS.borderSubtle } },
+          axisLabel: { color: COLORS.textMuted, fontSize: 11 }
+        },
+        yAxis: {
+          type: 'value',
+          axisLine: { show: false },
+          splitLine: { lineStyle: { color: COLORS.borderSubtle } },
+          axisLabel: { color: COLORS.textMuted, fontSize: 10, formatter: (v) => formatNumber(v) }
+        },
+        series: [
+          {
+            name: 'Input',
+            type: 'bar',
+            stack: 'tokens',
+            barWidth: 40,
+            itemStyle: { color: COLORS.blue, borderRadius: [0, 0, 0, 0] },
+            data: [inputDelta, point.inputTokens]
+          },
+          {
+            name: 'Output',
+            type: 'bar',
+            stack: 'tokens',
+            barWidth: 40,
+            itemStyle: { color: COLORS.purple, borderRadius: [4, 4, 0, 0] },
+            data: [outputDelta, point.outputTokens]
+          }
+        ]
+      }), [inputDelta, outputDelta, point]);
+
+      const time = new Date(point.timestamp);
+      const projectName = session.project.split('/').pop() || 'Unknown';
+
+      return (
+        <div>
+          {/* Header */}
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl font-bold" style={{ color: COLORS.coral }}>Message #{selectedIndex + 1}</span>
+              <span className="px-2 py-1 rounded text-xs font-medium" style={{ background: COLORS.surface3, color: COLORS.textSecondary }}>
+                {getModelDisplayName(session.model)}
+              </span>
+            </div>
+            <div className="flex items-center gap-4 text-sm" style={{ color: COLORS.textMuted }}>
+              <span>{projectName}</span>
+              <span>•</span>
+              <span>{time.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+              <span>{time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+            </div>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="p-4 rounded-lg" style={{ background: COLORS.surface2 }}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-2 h-2 rounded-full" style={{ background: COLORS.amber }}></span>
+                <span className="text-xs uppercase tracking-wider" style={{ color: COLORS.textMuted }}>Total</span>
+              </div>
+              <div className="text-xl font-bold" style={{ color: COLORS.text }}>{formatNumber(point.totalTokens)}</div>
+              <div className="text-sm font-medium" style={{ color: totalDelta >= 0 ? COLORS.green : COLORS.coral }}>
+                +{formatNumber(totalDelta)}
+              </div>
+            </div>
+            <div className="p-4 rounded-lg" style={{ background: COLORS.surface2 }}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-2 h-2 rounded-full" style={{ background: COLORS.blue }}></span>
+                <span className="text-xs uppercase tracking-wider" style={{ color: COLORS.textMuted }}>Input</span>
+              </div>
+              <div className="text-xl font-bold" style={{ color: COLORS.text }}>{formatNumber(point.inputTokens)}</div>
+              <div className="text-sm font-medium" style={{ color: COLORS.blue }}>
+                +{formatNumber(inputDelta)}
+              </div>
+            </div>
+            <div className="p-4 rounded-lg" style={{ background: COLORS.surface2 }}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-2 h-2 rounded-full" style={{ background: COLORS.purple }}></span>
+                <span className="text-xs uppercase tracking-wider" style={{ color: COLORS.textMuted }}>Output</span>
+              </div>
+              <div className="text-xl font-bold" style={{ color: COLORS.text }}>{formatNumber(point.outputTokens)}</div>
+              <div className="text-sm font-medium" style={{ color: COLORS.purple }}>
+                +{formatNumber(outputDelta)}
+              </div>
+            </div>
+          </div>
+
+          {/* Charts */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-lg" style={{ background: COLORS.surface2 }}>
+              <h4 className="text-sm font-medium mb-3" style={{ color: COLORS.text }}>Context View</h4>
+              <p className="text-xs mb-3" style={{ color: COLORS.textMuted }}>Messages {contextStart + 1} to {contextEnd + 1}</p>
+              <Chart option={contextChartOption} height={180} />
+            </div>
+            <div className="p-4 rounded-lg" style={{ background: COLORS.surface2 }}>
+              <h4 className="text-sm font-medium mb-3" style={{ color: COLORS.text }}>Token Breakdown</h4>
+              <p className="text-xs mb-3" style={{ color: COLORS.textMuted }}>This message vs cumulative</p>
+              <Chart option={breakdownChartOption} height={180} />
+            </div>
+          </div>
+
+          {/* Progress indicators */}
+          <div className="mt-6 p-4 rounded-lg" style={{ background: COLORS.surface2 }}>
+            <h4 className="text-sm font-medium mb-4" style={{ color: COLORS.text }}>Session Progress</h4>
+            <div className="space-y-3">
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span style={{ color: COLORS.textMuted }}>Message Position</span>
+                  <span style={{ color: COLORS.text }}>{selectedIndex + 1} of {timeline.length}</span>
+                </div>
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: COLORS.surface3 }}>
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${((selectedIndex + 1) / timeline.length) * 100}%`,
+                      background: `linear-gradient(90deg, ${COLORS.coral}, ${COLORS.amber})`
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span style={{ color: COLORS.textMuted }}>Token Usage</span>
+                  <span style={{ color: COLORS.text }}>{formatNumber(point.totalTokens)} of {formatNumber(session.totalTokens)}</span>
+                </div>
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: COLORS.surface3 }}>
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${(point.totalTokens / session.totalTokens) * 100}%`,
+                      background: `linear-gradient(90deg, ${COLORS.blue}, ${COLORS.purple})`
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <div className="flex justify-between mt-6 pt-4 border-t" style={{ borderColor: COLORS.borderSubtle }}>
+            <button
+              onClick={() => onClose(selectedIndex - 1)}
+              disabled={selectedIndex === 0}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors disabled:opacity-30"
+              style={{ background: COLORS.surface3, color: COLORS.text }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+              Previous
+            </button>
+            <button
+              onClick={() => onClose(selectedIndex + 1)}
+              disabled={selectedIndex === timeline.length - 1}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors disabled:opacity-30"
+              style={{ background: COLORS.surface3, color: COLORS.text }}
+            >
+              Next
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      );
+    };
+
+    // Session Growth Chart - Shows token evolution within a session
+    const SessionGrowth = ({ sessions }) => {
+      const sessionsWithTimeline = useMemo(() => {
+        return sessions.filter(s => s.tokenTimeline && s.tokenTimeline.length > 1);
+      }, [sessions]);
+
+      const [selectedSessionId, setSelectedSessionId] = useState(null);
+      const [selectedMessageIndex, setSelectedMessageIndex] = useState(null);
+
+      // Auto-select current session or first available
+      useEffect(() => {
+        if (!selectedSessionId && sessionsWithTimeline.length > 0) {
+          const current = sessionsWithTimeline.find(s => s.isCurrentSession);
+          setSelectedSessionId(current?.sessionId || sessionsWithTimeline[0].sessionId);
+        }
+      }, [sessionsWithTimeline, selectedSessionId]);
+
+      const selectedSession = useMemo(() => {
+        return sessionsWithTimeline.find(s => s.sessionId === selectedSessionId);
+      }, [sessionsWithTimeline, selectedSessionId]);
+
+      const handleChartClick = useCallback((params) => {
+        if (params.dataIndex !== undefined && selectedSession?.tokenTimeline) {
+          setSelectedMessageIndex(params.dataIndex);
+        }
+      }, [selectedSession]);
+
+      const handleModalClose = useCallback((newIndex) => {
+        if (typeof newIndex === 'number' && selectedSession?.tokenTimeline) {
+          if (newIndex >= 0 && newIndex < selectedSession.tokenTimeline.length) {
+            setSelectedMessageIndex(newIndex);
+          } else {
+            setSelectedMessageIndex(null);
+          }
+        } else {
+          setSelectedMessageIndex(null);
+        }
+      }, [selectedSession]);
+
+      const option = useMemo(() => {
+        if (!selectedSession || !selectedSession.tokenTimeline) {
+          return {
+            backgroundColor: 'transparent',
+            graphic: {
+              type: 'text',
+              left: 'center',
+              top: 'middle',
+              style: { text: 'No session data available', fill: COLORS.textMuted, fontSize: 14 }
+            }
+          };
+        }
+
+        const timeline = selectedSession.tokenTimeline;
+
+        // Calculate per-message deltas for a stacked area view
+        const inputDeltas = [];
+        const outputDeltas = [];
+        let prevInput = 0;
+        let prevOutput = 0;
+
+        timeline.forEach((point, i) => {
+          inputDeltas.push(point.inputTokens - prevInput);
+          outputDeltas.push(point.outputTokens - prevOutput);
+          prevInput = point.inputTokens;
+          prevOutput = point.outputTokens;
+        });
+
+        // Format time labels
+        const timeLabels = timeline.map((t, i) => {
+          const d = new Date(t.timestamp);
+          return `#${i + 1}`;
+        });
+
+        return {
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'axis',
+            backgroundColor: COLORS.surface2,
+            borderColor: COLORS.border,
+            textStyle: { color: COLORS.text },
+            formatter: (params) => {
+              const idx = params[0].dataIndex;
+              const point = timeline[idx];
+              const time = new Date(point.timestamp).toLocaleTimeString('en-US', {
+                hour: '2-digit', minute: '2-digit'
+              });
+              let result = `<div style="font-weight:600;margin-bottom:8px">Message ${idx + 1} <span style="color:${COLORS.textMuted};font-weight:400">${time}</span></div>`;
+              result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                <span style="width:8px;height:8px;border-radius:50%;background:${COLORS.amber}"></span>
+                <span style="color:${COLORS.textSecondary}">Total:</span>
+                <span style="font-weight:500">${formatNumber(point.totalTokens)}</span>
+              </div>`;
+              result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                <span style="width:8px;height:8px;border-radius:50%;background:${COLORS.purple}"></span>
+                <span style="color:${COLORS.textSecondary}">Output:</span>
+                <span style="font-weight:500">${formatNumber(point.outputTokens)}</span>
+                <span style="color:${COLORS.textMuted}">(+${formatNumber(outputDeltas[idx])})</span>
+              </div>`;
+              result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                <span style="width:8px;height:8px;border-radius:50%;background:${COLORS.blue}"></span>
+                <span style="color:${COLORS.textSecondary}">Input:</span>
+                <span style="font-weight:500">${formatNumber(point.inputTokens)}</span>
+                <span style="color:${COLORS.textMuted}">(+${formatNumber(inputDeltas[idx])})</span>
+              </div>`;
+              result += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid ${COLORS.border};font-size:11px;color:${COLORS.textMuted}">Click for details</div>`;
+              return result;
+            }
+          },
+          legend: {
+            data: ['Total', 'Output', 'Input'],
+            textStyle: { color: COLORS.textMuted, fontSize: 11 },
+            bottom: 0,
+            itemWidth: 12,
+            itemHeight: 8
+          },
+          grid: { left: 50, right: 15, top: 15, bottom: 40 },
+          xAxis: {
+            type: 'category',
+            data: timeLabels,
+            axisLine: { lineStyle: { color: COLORS.borderSubtle } },
+            axisLabel: {
+              color: COLORS.textMuted,
+              fontSize: 10,
+              interval: Math.max(0, Math.floor(timeline.length / 10) - 1)
+            },
+            axisTick: { show: false },
+            triggerEvent: true
+          },
+          yAxis: {
+            type: 'value',
+            axisLine: { show: false },
+            splitLine: { lineStyle: { color: COLORS.borderSubtle } },
+            axisLabel: { color: COLORS.textMuted, fontSize: 10, formatter: (v) => formatNumber(v) }
+          },
+          series: [
+            {
+              name: 'Total',
+              type: 'line',
+              smooth: true,
+              symbol: 'circle',
+              symbolSize: 6,
+              showSymbol: timeline.length < 50,
+              lineStyle: { width: 2, color: COLORS.amber },
+              itemStyle: { color: COLORS.amber },
+              areaStyle: { opacity: 0.08, color: COLORS.amber },
+              emphasis: {
+                scale: true,
+                itemStyle: { color: COLORS.coral, borderColor: '#fff', borderWidth: 2 }
+              },
+              data: timeline.map(t => t.totalTokens)
+            },
+            {
+              name: 'Output',
+              type: 'line',
+              smooth: true,
+              symbol: 'circle',
+              symbolSize: 4,
+              showSymbol: timeline.length < 50,
+              lineStyle: { width: 2, color: COLORS.purple },
+              itemStyle: { color: COLORS.purple },
+              emphasis: {
+                scale: true,
+                itemStyle: { borderColor: '#fff', borderWidth: 2 }
+              },
+              data: timeline.map(t => t.outputTokens)
+            },
+            {
+              name: 'Input',
+              type: 'line',
+              smooth: true,
+              symbol: 'circle',
+              symbolSize: 4,
+              showSymbol: timeline.length < 50,
+              lineStyle: { width: 2, color: COLORS.blue },
+              itemStyle: { color: COLORS.blue },
+              emphasis: {
+                scale: true,
+                itemStyle: { borderColor: '#fff', borderWidth: 2 }
+              },
+              data: timeline.map(t => t.inputTokens)
+            }
+          ]
+        };
+      }, [selectedSession]);
+
+      if (sessionsWithTimeline.length === 0) {
+        return (
+          <div className="flex items-center justify-center h-48" style={{ color: COLORS.textMuted }}>
+            No session timeline data available
+          </div>
+        );
+      }
+
+      const projectName = selectedSession?.project.split('/').pop() || 'Unknown';
+
+      return (
+        <div>
+          {/* Session Selector */}
+          <div className="flex items-center justify-between mb-4">
+            <select
+              value={selectedSessionId || ''}
+              onChange={(e) => setSelectedSessionId(e.target.value)}
+              className="text-sm px-3 py-1.5 rounded-lg border appearance-none cursor-pointer"
+              style={{
+                background: COLORS.surface2,
+                borderColor: COLORS.border,
+                color: COLORS.text,
+                minWidth: 200
+              }}
+            >
+              {sessionsWithTimeline.map(s => {
+                const name = s.project.split('/').pop() || 'Unknown';
+                const date = new Date(s.lastActivity).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                return (
+                  <option key={s.sessionId} value={s.sessionId}>
+                    {name} ({date}) - {s.tokenTimeline?.length || 0} msgs
+                    {s.isCurrentSession ? ' ★' : ''}
+                  </option>
+                );
+              })}
+            </select>
+            {selectedSession && (
+              <div className="flex items-center gap-3 text-xs" style={{ color: COLORS.textMuted }}>
+                <span>{getModelDisplayName(selectedSession.model)}</span>
+                <span>{formatNumber(selectedSession.totalTokens)} tokens</span>
+                {selectedSession.isCurrentSession && (
+                  <span className="flex items-center gap-1" style={{ color: COLORS.green }}>
+                    <span className="w-1.5 h-1.5 rounded-full pulse" style={{ background: COLORS.green }} />
+                    Live
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="text-xs mb-2" style={{ color: COLORS.textMuted }}>
+            💡 Click on any point to see detailed breakdown
+          </div>
+          <Chart option={option} height={260} onClick={handleChartClick} />
+
+          {/* Modal for message detail */}
+          <Modal isOpen={selectedMessageIndex !== null} onClose={() => setSelectedMessageIndex(null)}>
+            {selectedSession && selectedMessageIndex !== null && selectedSession.tokenTimeline && (
+              <MessageSectionDetail
+                session={selectedSession}
+                selectedIndex={selectedMessageIndex}
+                timeline={selectedSession.tokenTimeline}
+                onClose={handleModalClose}
+              />
+            )}
+          </Modal>
+        </div>
+      );
+    };
+
+    // Session Detail Page - Shows per-message token breakdown
+    const SessionDetailPage = ({ sessionId, onBack }) => {
+      const [sessionDetail, setSessionDetail] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
+      const [selectedMessage, setSelectedMessage] = useState(null);
+
+      useEffect(() => {
+        async function fetchSessionDetail() {
+          setLoading(true);
+          setError(null);
+          try {
+            const res = await fetch(`/api/session/${sessionId}`);
+            if (!res.ok) throw new Error('Session not found');
+            const data = await res.json();
+            setSessionDetail(data);
+          } catch (err) {
+            setError(err.message);
+          } finally {
+            setLoading(false);
+          }
+        }
+        if (sessionId) fetchSessionDetail();
+      }, [sessionId]);
+
+      // Context growth chart
+      const contextChartOption = useMemo(() => {
+        if (!sessionDetail?.messages) return null;
+
+        const assistantMsgs = sessionDetail.messages.filter(m => m.type === 'assistant' && m.cumulativeTotal > 0);
+        if (assistantMsgs.length === 0) return null;
+
+        return {
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'axis',
+            backgroundColor: COLORS.surface2,
+            borderColor: COLORS.border,
+            textStyle: { color: COLORS.text },
+            formatter: (params) => {
+              const idx = params[0].dataIndex;
+              const msg = assistantMsgs[idx];
+              return `<div style="font-weight:600;margin-bottom:8px">Message #${msg.index + 1}</div>
+                <div>Context: ${formatNumber(msg.cumulativeInput)}</div>
+                <div>Output: ${formatNumber(msg.cumulativeOutput)}</div>
+                <div style="color:${COLORS.amber}">Total: ${formatNumber(msg.cumulativeTotal)}</div>`;
+            }
+          },
+          grid: { left: 60, right: 20, top: 30, bottom: 40 },
+          legend: {
+            data: ['Context (Input)', 'Output', 'Total'],
+            textStyle: { color: COLORS.textMuted, fontSize: 11 },
+            top: 0
+          },
+          xAxis: {
+            type: 'category',
+            data: assistantMsgs.map(m => `#${m.index + 1}`),
+            axisLine: { lineStyle: { color: COLORS.borderSubtle } },
+            axisLabel: { color: COLORS.textMuted, fontSize: 10, interval: Math.max(0, Math.floor(assistantMsgs.length / 15)) }
+          },
+          yAxis: {
+            type: 'value',
+            name: 'Tokens',
+            nameTextStyle: { color: COLORS.textMuted, fontSize: 10 },
+            axisLine: { show: false },
+            splitLine: { lineStyle: { color: COLORS.borderSubtle } },
+            axisLabel: { color: COLORS.textMuted, fontSize: 10, formatter: v => formatNumber(v) }
+          },
+          series: [
+            {
+              name: 'Context (Input)',
+              type: 'line',
+              smooth: true,
+              symbol: 'circle',
+              symbolSize: 4,
+              showSymbol: assistantMsgs.length < 50,
+              lineStyle: { width: 2, color: COLORS.blue },
+              itemStyle: { color: COLORS.blue },
+              areaStyle: { opacity: 0.1, color: COLORS.blue },
+              data: assistantMsgs.map(m => m.cumulativeInput)
+            },
+            {
+              name: 'Output',
+              type: 'line',
+              smooth: true,
+              symbol: 'circle',
+              symbolSize: 4,
+              showSymbol: assistantMsgs.length < 50,
+              lineStyle: { width: 2, color: COLORS.purple },
+              itemStyle: { color: COLORS.purple },
+              data: assistantMsgs.map(m => m.cumulativeOutput)
+            },
+            {
+              name: 'Total',
+              type: 'line',
+              smooth: true,
+              symbol: 'circle',
+              symbolSize: 4,
+              showSymbol: assistantMsgs.length < 50,
+              lineStyle: { width: 2, color: COLORS.amber },
+              itemStyle: { color: COLORS.amber },
+              data: assistantMsgs.map(m => m.cumulativeTotal)
+            }
+          ]
+        };
+      }, [sessionDetail]);
+
+      if (loading) {
+        return (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin w-8 h-8 border-2 rounded-full mx-auto mb-4" style={{ borderColor: COLORS.coral, borderTopColor: 'transparent' }}></div>
+              <p style={{ color: COLORS.textMuted }}>Loading session details...</p>
+            </div>
+          </div>
+        );
+      }
+
+      if (error) {
+        return (
+          <div className="card p-8 text-center">
+            <div className="mb-4" style={{ color: COLORS.coral }}>{Icons.info}</div>
+            <p style={{ color: COLORS.text }}>Error: {error}</p>
+            <button onClick={onBack} className="mt-4 px-4 py-2 rounded-lg" style={{ background: COLORS.surface3, color: COLORS.text }}>
+              Go Back
+            </button>
+          </div>
+        );
+      }
+
+      if (!sessionDetail) return null;
+
+      const projectName = sessionDetail.project.split('/').pop() || 'Unknown';
+      const startTime = new Date(sessionDetail.startTime);
+      const endTime = new Date(sessionDetail.lastActivity);
+      const duration = endTime.getTime() - startTime.getTime();
+      const durationMins = Math.round(duration / 60000);
+
+      return (
+        <div className="space-y-6">
+          {/* Back Button & Header */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onBack}
+              className="p-2 rounded-lg transition-colors hover:bg-white/10"
+              style={{ color: COLORS.textSecondary }}
+            >
+              {Icons.arrowLeft}
+            </button>
+            <div className="flex-1">
+              <h1 className="text-xl font-bold" style={{ color: COLORS.text }}>{projectName}</h1>
+              <div className="flex items-center gap-3 text-sm" style={{ color: COLORS.textMuted }}>
+                <span className="font-mono text-xs">{sessionDetail.sessionId.slice(0, 12)}...</span>
+                <span>•</span>
+                <span>{startTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                <span>•</span>
+                <span>{durationMins > 60 ? `${Math.round(durationMins / 60)}h ${durationMins % 60}m` : `${durationMins}m`}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full" style={{ background: getModelColor(sessionDetail.model) }}></span>
+              <span className="font-medium" style={{ color: getModelColor(sessionDetail.model) }}>
+                {getModelDisplayName(sessionDetail.model)}
+              </span>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="card p-4 text-center">
+              <div className="text-xs uppercase tracking-wider mb-2" style={{ color: COLORS.textMuted }}>Messages</div>
+              <div className="text-2xl font-bold" style={{ color: COLORS.text }}>{sessionDetail.messages.length}</div>
+            </div>
+            <div className="card p-4 text-center">
+              <div className="text-xs uppercase tracking-wider mb-2" style={{ color: COLORS.blue }}>Input/Context</div>
+              <div className="text-2xl font-bold" style={{ color: COLORS.blue }}>{formatNumber(sessionDetail.totalInputTokens)}</div>
+            </div>
+            <div className="card p-4 text-center">
+              <div className="text-xs uppercase tracking-wider mb-2" style={{ color: COLORS.purple }}>Output</div>
+              <div className="text-2xl font-bold" style={{ color: COLORS.purple }}>{formatNumber(sessionDetail.totalOutputTokens)}</div>
+            </div>
+            <div className="card p-4 text-center">
+              <div className="text-xs uppercase tracking-wider mb-2" style={{ color: COLORS.green }}>Cache Read</div>
+              <div className="text-2xl font-bold" style={{ color: COLORS.green }}>{formatNumber(sessionDetail.totalCacheReadTokens)}</div>
+            </div>
+            <div className="card p-4 text-center">
+              <div className="text-xs uppercase tracking-wider mb-2" style={{ color: COLORS.amber }}>Cache Write</div>
+              <div className="text-2xl font-bold" style={{ color: COLORS.amber }}>{formatNumber(sessionDetail.totalCacheWriteTokens)}</div>
+            </div>
+          </div>
+
+          {/* Context Growth Chart */}
+          {contextChartOption && (
+            <div className="card p-5">
+              <div className="section-header mb-4">
+                <span style={{ color: COLORS.coral }}>{Icons.trendingUp}</span>
+                <div>
+                  <h2 className="section-title">Context Growth</h2>
+                  <p className="section-desc">How context window grows through the conversation</p>
+                </div>
+              </div>
+              <Chart option={contextChartOption} height={280} />
+            </div>
+          )}
+
+          {/* Messages Table */}
+          <div className="card overflow-hidden">
+            <div className="p-5 border-b" style={{ borderColor: COLORS.borderSubtle }}>
+              <div className="section-header">
+                <span style={{ color: COLORS.coral }}>{Icons.messageSquare}</span>
+                <div>
+                  <h2 className="section-title">Message Details</h2>
+                  <p className="section-desc">Token breakdown for each message in the conversation</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ background: COLORS.surface2 }}>
+                    <th className="text-left p-3 font-medium" style={{ color: COLORS.textSecondary }}>#</th>
+                    <th className="text-left p-3 font-medium" style={{ color: COLORS.textSecondary }}>Type</th>
+                    <th className="text-left p-3 font-medium" style={{ color: COLORS.textSecondary }}>Time</th>
+                    <th className="text-right p-3 font-medium" style={{ color: COLORS.blue }}>Input</th>
+                    <th className="text-right p-3 font-medium" style={{ color: COLORS.purple }}>Output</th>
+                    <th className="text-right p-3 font-medium" style={{ color: COLORS.green }}>Cache Read</th>
+                    <th className="text-right p-3 font-medium" style={{ color: COLORS.amber }}>Cache Write</th>
+                    <th className="text-right p-3 font-medium" style={{ color: COLORS.textSecondary }}>Context</th>
+                    <th className="text-left p-3 font-medium" style={{ color: COLORS.textSecondary }}>Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessionDetail.messages.map((msg, idx) => {
+                    const time = msg.timestamp ? new Date(msg.timestamp) : null;
+                    const isUser = msg.type === 'user';
+                    const hasTokens = msg.inputTokens > 0 || msg.outputTokens > 0;
+
+                    return (
+                      <tr
+                        key={idx}
+                        className="border-t transition-colors hover:bg-white/5"
+                        style={{ borderColor: COLORS.borderSubtle }}
+                      >
+                        <td className="p-3 font-mono text-xs" style={{ color: COLORS.textMuted }}>{msg.index + 1}</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <span style={{ color: isUser ? COLORS.blue : COLORS.coral }}>
+                              {isUser ? Icons.user : Icons.bot}
+                            </span>
+                            <span style={{ color: isUser ? COLORS.blue : COLORS.coral }}>
+                              {isUser ? 'User' : 'Assistant'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-xs" style={{ color: COLORS.textMuted }}>
+                          {time ? time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'}
+                        </td>
+                        <td className="p-3 text-right font-mono" style={{ color: msg.inputTokens > 0 ? COLORS.blue : COLORS.textMuted }}>
+                          {msg.inputTokens > 0 ? formatNumber(msg.inputTokens) : '-'}
+                        </td>
+                        <td className="p-3 text-right font-mono" style={{ color: msg.outputTokens > 0 ? COLORS.purple : COLORS.textMuted }}>
+                          {msg.outputTokens > 0 ? formatNumber(msg.outputTokens) : '-'}
+                        </td>
+                        <td className="p-3 text-right font-mono" style={{ color: msg.cacheReadTokens > 0 ? COLORS.green : COLORS.textMuted }}>
+                          {msg.cacheReadTokens > 0 ? formatNumber(msg.cacheReadTokens) : '-'}
+                        </td>
+                        <td className="p-3 text-right font-mono" style={{ color: msg.cacheWriteTokens > 0 ? COLORS.amber : COLORS.textMuted }}>
+                          {msg.cacheWriteTokens > 0 ? formatNumber(msg.cacheWriteTokens) : '-'}
+                        </td>
+                        <td className="p-3 text-right">
+                          {hasTokens && (
+                            <span className="font-mono text-xs px-2 py-1 rounded" style={{ background: COLORS.surface3, color: COLORS.text }}>
+                              {formatNumber(msg.cumulativeTotal)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <div className="max-w-xs">
+                            {msg.toolsUsed && msg.toolsUsed.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-1">
+                                {msg.toolsUsed.slice(0, 3).map((tool, i) => (
+                                  <span key={i} className="text-xs px-1.5 py-0.5 rounded" style={{ background: COLORS.purple + '20', color: COLORS.purple }}>
+                                    {tool}
+                                  </span>
+                                ))}
+                                {msg.toolsUsed.length > 3 && (
+                                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: COLORS.surface3, color: COLORS.textMuted }}>
+                                    +{msg.toolsUsed.length - 3}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {msg.preview && (
+                              <p className="text-xs truncate" style={{ color: COLORS.textMuted, maxWidth: 200 }}>
+                                {msg.preview}
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Summary Footer */}
+            <div className="p-4 border-t flex items-center justify-between" style={{ borderColor: COLORS.borderSubtle, background: COLORS.surface2 }}>
+              <span className="text-sm font-medium" style={{ color: COLORS.text }}>Total</span>
+              <div className="flex items-center gap-6 text-sm font-mono">
+                <span style={{ color: COLORS.blue }}>{formatNumber(sessionDetail.totalInputTokens)}</span>
+                <span style={{ color: COLORS.purple }}>{formatNumber(sessionDetail.totalOutputTokens)}</span>
+                <span style={{ color: COLORS.green }}>{formatNumber(sessionDetail.totalCacheReadTokens)}</span>
+                <span style={{ color: COLORS.amber }}>{formatNumber(sessionDetail.totalCacheWriteTokens)}</span>
+                <span className="px-3 py-1 rounded font-semibold" style={{ background: COLORS.coral + '20', color: COLORS.coral }}>
+                  {formatNumber(sessionDetail.totalInputTokens + sessionDetail.totalOutputTokens)} total
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Pricing data for estimator
+    const PRICING_DATA = {
+      'claude-opus-4-5-20251101': {
+        name: 'Opus 4.5',
+        input: 15,
+        output: 75,
+        cacheRead: 1.875,
+        cacheWrite: 18.75,
+        color: COLORS.coral
+      },
+      'claude-sonnet-4-5-20250929': {
+        name: 'Sonnet 4.5',
+        input: 3,
+        output: 15,
+        cacheRead: 0.30,
+        cacheWrite: 3.75,
+        color: COLORS.blue
+      },
+      'claude-haiku-3-5-20241022': {
+        name: 'Haiku 3.5',
+        input: 0.80,
+        output: 4,
+        cacheRead: 0.08,
+        cacheWrite: 1,
+        color: COLORS.green
+      }
+    };
+
+    // Price Estimator Tab
+    const PriceEstimator = ({ stats }) => {
+      const costBreakdown = useMemo(() => {
+        const breakdown = [];
+        let totalCost = 0;
+        let totalInputCost = 0;
+        let totalOutputCost = 0;
+        let totalCacheReadCost = 0;
+        let totalCacheWriteCost = 0;
+
+        for (const [modelId, usage] of Object.entries(stats.modelUsage)) {
+          const pricing = PRICING_DATA[modelId] || PRICING_DATA['claude-sonnet-4-5-20250929'];
+          const inputCost = (usage.inputTokens / 1_000_000) * pricing.input;
+          const outputCost = (usage.outputTokens / 1_000_000) * pricing.output;
+          const cacheReadCost = (usage.cacheReadInputTokens / 1_000_000) * pricing.cacheRead;
+          const cacheWriteCost = (usage.cacheCreationInputTokens / 1_000_000) * pricing.cacheWrite;
+          const modelCost = inputCost + outputCost + cacheReadCost + cacheWriteCost;
+          totalCost += modelCost;
+          totalInputCost += inputCost;
+          totalOutputCost += outputCost;
+          totalCacheReadCost += cacheReadCost;
+          totalCacheWriteCost += cacheWriteCost;
+
+          // Calculate savings from cache (what it would have cost without cache)
+          const cacheReadWithoutDiscount = (usage.cacheReadInputTokens / 1_000_000) * pricing.input;
+          const cacheSavings = cacheReadWithoutDiscount - cacheReadCost;
+
+          breakdown.push({
+            model: pricing.name || getModelDisplayName(modelId),
+            modelId,
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            cacheReadTokens: usage.cacheReadInputTokens,
+            cacheWriteTokens: usage.cacheCreationInputTokens,
+            inputCost,
+            outputCost,
+            cacheReadCost,
+            cacheWriteCost,
+            totalCost: modelCost,
+            cacheSavings,
+            color: pricing.color || COLORS.textMuted
+          });
+        }
+
+        // Calculate total savings
+        let totalSavings = 0;
+        breakdown.forEach(b => totalSavings += b.cacheSavings);
+
+        return {
+          breakdown: breakdown.sort((a, b) => b.totalCost - a.totalCost),
+          totalCost,
+          totalInputCost,
+          totalOutputCost,
+          totalCacheReadCost,
+          totalCacheWriteCost,
+          totalSavings
+        };
+      }, [stats.modelUsage]);
+
+      // Calculate projections based on daily average
+      const projections = useMemo(() => {
+        const days = stats.dailyActivity?.length || 1;
+        const dailyAvg = costBreakdown.totalCost / Math.max(days, 1);
+        return {
+          daily: dailyAvg,
+          weekly: dailyAvg * 7,
+          monthly: dailyAvg * 30,
+          yearly: dailyAvg * 365
+        };
+      }, [costBreakdown.totalCost, stats.dailyActivity]);
+
+      // Pie chart for model distribution
+      const modelChartOption = useMemo(() => {
+        if (costBreakdown.breakdown.length === 0) return { series: [] };
+        return {
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'item',
+            backgroundColor: COLORS.surface2,
+            borderColor: COLORS.border,
+            textStyle: { color: COLORS.text },
+            formatter: (p) => `<div style="font-weight:600">${p.name}</div><div>${formatCurrency(p.value)} (${p.percent.toFixed(1)}%)</div>`
+          },
+          series: [{
+            type: 'pie',
+            radius: ['55%', '80%'],
+            center: ['50%', '50%'],
+            itemStyle: { borderColor: COLORS.surface1, borderWidth: 3 },
+            label: { show: false },
+            emphasis: { scale: true, scaleSize: 8 },
+            data: costBreakdown.breakdown.map(b => ({
+              name: b.model,
+              value: b.totalCost,
+              itemStyle: { color: b.color }
+            }))
+          }]
+        };
+      }, [costBreakdown]);
+
+      // Bar chart for cost breakdown by type
+      const costTypeChartOption = useMemo(() => {
+        return {
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'axis',
+            backgroundColor: COLORS.surface2,
+            borderColor: COLORS.border,
+            textStyle: { color: COLORS.text }
+          },
+          grid: { left: 20, right: 20, top: 20, bottom: 30, containLabel: true },
+          xAxis: {
+            type: 'category',
+            data: ['Input', 'Output', 'Cache Read', 'Cache Write'],
+            axisLine: { lineStyle: { color: COLORS.borderSubtle } },
+            axisLabel: { color: COLORS.textMuted, fontSize: 11 },
+            axisTick: { show: false }
+          },
+          yAxis: {
+            type: 'value',
+            axisLine: { show: false },
+            splitLine: { lineStyle: { color: COLORS.borderSubtle } },
+            axisLabel: { color: COLORS.textMuted, fontSize: 10, formatter: (v) => formatCurrency(v) }
+          },
+          series: [{
+            type: 'bar',
+            barWidth: 40,
+            itemStyle: {
+              borderRadius: [6, 6, 0, 0],
+              color: (params) => {
+                const colors = [COLORS.blue, COLORS.purple, COLORS.green, COLORS.amber];
+                return colors[params.dataIndex];
+              }
+            },
+            data: [
+              costBreakdown.totalInputCost,
+              costBreakdown.totalOutputCost,
+              costBreakdown.totalCacheReadCost,
+              costBreakdown.totalCacheWriteCost
+            ]
+          }]
+        };
+      }, [costBreakdown]);
+
+      return (
+        <div className="space-y-6">
+          {/* Disclaimer Banner */}
+          <div className="card p-4 border-l-4" style={{ borderLeftColor: COLORS.amber, background: `linear-gradient(90deg, ${COLORS.amber}08, ${COLORS.surface1})` }}>
+            <div className="flex items-start gap-3">
+              <span style={{ color: COLORS.amber }}>{Icons.info}</span>
+              <div>
+                <p className="text-sm font-medium" style={{ color: COLORS.text }}>API Pricing Estimate Only</p>
+                <p className="text-xs mt-1" style={{ color: COLORS.textMuted }}>
+                  This is based on Anthropic API pay-as-you-go rates. <strong style={{ color: COLORS.textSecondary }}>Claude Code Pro/Teams/Enterprise subscribers pay a fixed monthly fee</strong> regardless of usage.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Hero Cost Section */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Total Cost */}
+            <div className="card p-6" style={{ background: `linear-gradient(135deg, ${COLORS.coral}15, ${COLORS.surface1})`, borderColor: COLORS.coral + '40' }}>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider" style={{ color: COLORS.coral }}>Estimated Total Cost</p>
+                  <p className="text-5xl font-bold mt-2" style={{ color: COLORS.text }}>{formatCurrency(costBreakdown.totalCost)}</p>
+                </div>
+                <div className="p-3 rounded-xl" style={{ background: COLORS.coral + '20' }}>
+                  {Icons.dollar}
+                </div>
+              </div>
+              <div className="flex items-center gap-4 pt-4 border-t" style={{ borderColor: COLORS.borderSubtle }}>
+                <div>
+                  <p className="text-xs" style={{ color: COLORS.textMuted }}>Tokens Used</p>
+                  <p className="font-semibold" style={{ color: COLORS.text }}>{formatNumber(stats.totalTokens)}</p>
+                </div>
+                <div className="w-px h-8" style={{ background: COLORS.borderSubtle }}></div>
+                <div>
+                  <p className="text-xs" style={{ color: COLORS.textMuted }}>Sessions</p>
+                  <p className="font-semibold" style={{ color: COLORS.text }}>{stats.totalSessions}</p>
+                </div>
+                <div className="w-px h-8" style={{ background: COLORS.borderSubtle }}></div>
+                <div>
+                  <p className="text-xs" style={{ color: COLORS.textMuted }}>Messages</p>
+                  <p className="font-semibold" style={{ color: COLORS.text }}>{formatNumber(stats.totalMessages)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Cache Savings */}
+            <div className="card p-6" style={{ background: `linear-gradient(135deg, ${COLORS.green}15, ${COLORS.surface1})`, borderColor: COLORS.green + '40' }}>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider" style={{ color: COLORS.green }}>Cache Savings</p>
+                  <p className="text-5xl font-bold mt-2" style={{ color: COLORS.text }}>{formatCurrency(costBreakdown.totalSavings)}</p>
+                </div>
+                <div className="p-3 rounded-xl" style={{ background: COLORS.green + '20' }}>
+                  {Icons.zap}
+                </div>
+              </div>
+              <div className="pt-4 border-t" style={{ borderColor: COLORS.borderSubtle }}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs" style={{ color: COLORS.textMuted }}>Cache Efficiency</span>
+                  <span className="text-sm font-semibold" style={{ color: COLORS.green }}>{stats.cacheEfficiency.toFixed(1)}%</span>
+                </div>
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: COLORS.surface3 }}>
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(stats.cacheEfficiency, 100)}%`,
+                      background: `linear-gradient(90deg, ${COLORS.green}, ${COLORS.blue})`
+                    }}
+                  />
+                </div>
+                <p className="text-xs mt-2" style={{ color: COLORS.textMuted }}>
+                  {formatNumber(stats.cacheReadTokens)} tokens served from cache
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Projections */}
+          <div className="card p-6">
+            <h3 className="text-sm font-semibold mb-4 flex items-center gap-2" style={{ color: COLORS.text }}>
+              {Icons.trendingUp}
+              <span>Cost Projections</span>
+              <span className="text-xs font-normal px-2 py-0.5 rounded" style={{ background: COLORS.surface3, color: COLORS.textMuted }}>Based on average usage</span>
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl text-center" style={{ background: COLORS.surface2 }}>
+                <p className="text-xs uppercase tracking-wider mb-2" style={{ color: COLORS.textMuted }}>Daily</p>
+                <p className="text-xl font-bold" style={{ color: COLORS.text }}>{formatCurrency(projections.daily)}</p>
+              </div>
+              <div className="p-4 rounded-xl text-center" style={{ background: COLORS.surface2 }}>
+                <p className="text-xs uppercase tracking-wider mb-2" style={{ color: COLORS.textMuted }}>Weekly</p>
+                <p className="text-xl font-bold" style={{ color: COLORS.text }}>{formatCurrency(projections.weekly)}</p>
+              </div>
+              <div className="p-4 rounded-xl text-center" style={{ background: COLORS.surface2 }}>
+                <p className="text-xs uppercase tracking-wider mb-2" style={{ color: COLORS.textMuted }}>Monthly</p>
+                <p className="text-xl font-bold" style={{ color: COLORS.blue }}>{formatCurrency(projections.monthly)}</p>
+              </div>
+              <div className="p-4 rounded-xl text-center" style={{ background: COLORS.surface2 }}>
+                <p className="text-xs uppercase tracking-wider mb-2" style={{ color: COLORS.textMuted }}>Yearly</p>
+                <p className="text-xl font-bold" style={{ color: COLORS.purple }}>{formatCurrency(projections.yearly)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Charts Row */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Cost by Model */}
+            <div className="card p-6">
+              <h3 className="text-sm font-semibold mb-4" style={{ color: COLORS.text }}>Cost by Model</h3>
+              <div className="flex items-center gap-6">
+                <div style={{ width: 160, height: 160 }}>
+                  <Chart option={modelChartOption} height={160} />
+                </div>
+                <div className="flex-1 space-y-3">
+                  {costBreakdown.breakdown.map(b => (
+                    <div key={b.modelId} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full" style={{ background: b.color }}></span>
+                        <span className="text-sm" style={{ color: COLORS.text }}>{b.model}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-semibold" style={{ color: COLORS.text }}>{formatCurrency(b.totalCost)}</span>
+                        <span className="text-xs ml-2" style={{ color: COLORS.textMuted }}>
+                          ({((b.totalCost / costBreakdown.totalCost) * 100).toFixed(0)}%)
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Cost by Type */}
+            <div className="card p-6">
+              <h3 className="text-sm font-semibold mb-4" style={{ color: COLORS.text }}>Cost by Token Type</h3>
+              <Chart option={costTypeChartOption} height={180} />
+            </div>
+          </div>
+
+          {/* Pricing Reference */}
+          <div className="card overflow-hidden">
+            <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: COLORS.borderSubtle }}>
+              <div>
+                <h3 className="text-sm font-semibold" style={{ color: COLORS.text }}>API Pricing Reference</h3>
+                <p className="text-xs mt-1" style={{ color: COLORS.textMuted }}>Per 1 million tokens • Updated Dec 2024</p>
+              </div>
+              <a
+                href="https://www.anthropic.com/pricing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+                style={{ background: COLORS.surface3, color: COLORS.textSecondary }}
+              >
+                View Official Pricing →
+              </a>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ background: COLORS.surface2 }}>
+                    <th className="text-left p-4 font-medium" style={{ color: COLORS.textSecondary }}>Model</th>
+                    <th className="text-right p-4 font-medium" style={{ color: COLORS.blue }}>
+                      <div className="flex items-center justify-end gap-1">Input {Icons.arrowUp}</div>
+                    </th>
+                    <th className="text-right p-4 font-medium" style={{ color: COLORS.purple }}>
+                      <div className="flex items-center justify-end gap-1">Output {Icons.arrowDown}</div>
+                    </th>
+                    <th className="text-right p-4 font-medium" style={{ color: COLORS.green }}>Cache Read</th>
+                    <th className="text-right p-4 font-medium" style={{ color: COLORS.amber }}>Cache Write</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(PRICING_DATA).map(([id, p], idx) => (
+                    <tr key={id} className="border-t transition-colors hover:bg-white/5" style={{ borderColor: COLORS.borderSubtle }}>
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <span className="w-2 h-2 rounded-full" style={{ background: p.color }}></span>
+                          <span className="font-medium" style={{ color: p.color }}>{p.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-right font-mono" style={{ color: COLORS.text }}>${p.input}</td>
+                      <td className="p-4 text-right font-mono" style={{ color: COLORS.text }}>${p.output}</td>
+                      <td className="p-4 text-right font-mono" style={{ color: COLORS.textMuted }}>${p.cacheRead}</td>
+                      <td className="p-4 text-right font-mono" style={{ color: COLORS.textMuted }}>${p.cacheWrite}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Detailed Model Breakdown */}
+          <div className="card p-6">
+            <h3 className="text-sm font-semibold mb-5" style={{ color: COLORS.text }}>Detailed Usage Breakdown</h3>
+            <div className="space-y-4">
+              {costBreakdown.breakdown.map(b => {
+                const totalTokens = b.inputTokens + b.outputTokens;
+                const inputPct = totalTokens > 0 ? (b.inputTokens / totalTokens) * 100 : 0;
+                const outputPct = totalTokens > 0 ? (b.outputTokens / totalTokens) * 100 : 0;
+
+                return (
+                  <div key={b.modelId} className="p-5 rounded-xl" style={{ background: COLORS.surface2 }}>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <span className="w-3 h-3 rounded-full" style={{ background: b.color }}></span>
+                        <span className="font-semibold text-lg" style={{ color: b.color }}>{b.model}</span>
+                      </div>
+                      <span className="text-xl font-bold" style={{ color: COLORS.text }}>{formatCurrency(b.totalCost)}</span>
+                    </div>
+
+                    {/* Token Distribution Bar */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span style={{ color: COLORS.textMuted }}>Token Distribution</span>
+                        <span style={{ color: COLORS.textMuted }}>{formatNumber(totalTokens)} total</span>
+                      </div>
+                      <div className="h-3 rounded-full overflow-hidden flex" style={{ background: COLORS.surface3 }}>
+                        <div
+                          className="h-full transition-all"
+                          style={{ width: `${inputPct}%`, background: COLORS.blue }}
+                          title={`Input: ${formatNumber(b.inputTokens)}`}
+                        />
+                        <div
+                          className="h-full transition-all"
+                          style={{ width: `${outputPct}%`, background: COLORS.purple }}
+                          title={`Output: ${formatNumber(b.outputTokens)}`}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-xs mt-1">
+                        <span style={{ color: COLORS.blue }}>Input {inputPct.toFixed(0)}%</span>
+                        <span style={{ color: COLORS.purple }}>Output {outputPct.toFixed(0)}%</span>
+                      </div>
+                    </div>
+
+                    {/* Cost Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="p-3 rounded-lg" style={{ background: COLORS.surface3 }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-2 h-2 rounded-full" style={{ background: COLORS.blue }}></span>
+                          <span className="text-xs" style={{ color: COLORS.textMuted }}>Input</span>
+                        </div>
+                        <p className="font-semibold" style={{ color: COLORS.text }}>{formatNumber(b.inputTokens)}</p>
+                        <p className="text-xs" style={{ color: COLORS.blue }}>{formatCurrency(b.inputCost)}</p>
+                      </div>
+                      <div className="p-3 rounded-lg" style={{ background: COLORS.surface3 }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-2 h-2 rounded-full" style={{ background: COLORS.purple }}></span>
+                          <span className="text-xs" style={{ color: COLORS.textMuted }}>Output</span>
+                        </div>
+                        <p className="font-semibold" style={{ color: COLORS.text }}>{formatNumber(b.outputTokens)}</p>
+                        <p className="text-xs" style={{ color: COLORS.purple }}>{formatCurrency(b.outputCost)}</p>
+                      </div>
+                      <div className="p-3 rounded-lg" style={{ background: COLORS.surface3 }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-2 h-2 rounded-full" style={{ background: COLORS.green }}></span>
+                          <span className="text-xs" style={{ color: COLORS.textMuted }}>Cache Read</span>
+                        </div>
+                        <p className="font-semibold" style={{ color: COLORS.text }}>{formatNumber(b.cacheReadTokens)}</p>
+                        <p className="text-xs" style={{ color: COLORS.green }}>{formatCurrency(b.cacheReadCost)}</p>
+                      </div>
+                      <div className="p-3 rounded-lg" style={{ background: COLORS.surface3 }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-2 h-2 rounded-full" style={{ background: COLORS.amber }}></span>
+                          <span className="text-xs" style={{ color: COLORS.textMuted }}>Cache Write</span>
+                        </div>
+                        <p className="font-semibold" style={{ color: COLORS.text }}>{formatNumber(b.cacheWriteTokens)}</p>
+                        <p className="text-xs" style={{ color: COLORS.amber }}>{formatCurrency(b.cacheWriteCost)}</p>
+                      </div>
+                    </div>
+
+                    {/* Savings callout */}
+                    {b.cacheSavings > 0 && (
+                      <div className="mt-4 p-3 rounded-lg flex items-center justify-between" style={{ background: COLORS.green + '10', border: `1px solid ${COLORS.green}30` }}>
+                        <div className="flex items-center gap-2">
+                          <span style={{ color: COLORS.green }}>{Icons.zap}</span>
+                          <span className="text-sm" style={{ color: COLORS.green }}>Cache saved you</span>
+                        </div>
+                        <span className="font-bold" style={{ color: COLORS.green }}>{formatCurrency(b.cacheSavings)}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Main App
+    const App = () => {
+      const { stats, connected } = useTokenData();
+      const [activeTab, setActiveTab] = useState('dashboard');
+      const [timeRange, setTimeRange] = useState('weekly');
+      const [viewMode, setViewMode] = useState('models');
+      const [raceViewMode, setRaceViewMode] = useState('race');
+      const [selectedProject, setSelectedProject] = useState(null); // { sessions: [], projectName: '' }
+      const [selectedSessionId, setSelectedSessionId] = useState(null); // For session detail page
+
+      const lastUpdated = useMemo(() => {
+        return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      }, [stats]);
+
+      // Calculate filtered stats based on time range
+      const filteredStats = useMemo(() => {
+        const now = new Date();
+        let cutoffDate = null;
+
+        if (timeRange === 'daily') {
+          cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        } else if (timeRange === 'weekly') {
+          cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        }
+
+        if (!cutoffDate) {
+          // All time
+          return {
+            sessions: stats.totalSessions,
+            messages: stats.totalMessages
+          };
+        }
+
+        // Filter sessions by the cutoff date
+        const filteredSessions = stats.sessions.filter(s =>
+          s.lastActivity && new Date(s.lastActivity) >= cutoffDate
+        );
+
+        return {
+          sessions: filteredSessions.length,
+          messages: filteredSessions.reduce((sum, s) => sum + s.messageCount, 0)
+        };
+      }, [stats.sessions, stats.totalSessions, stats.totalMessages, timeRange]);
+
+      const handleProjectClick = useCallback((sessions, projectName) => {
+        setSelectedProject({ sessions, projectName });
+      }, []);
+
+      const handleSessionDetailClick = useCallback((sessionId) => {
+        setSelectedSessionId(sessionId);
+      }, []);
+
+      // If viewing session detail, show the detail page
+      if (selectedSessionId) {
+        return (
+          <div className="min-h-screen p-4 md:p-6 max-w-7xl mx-auto">
+            <SessionDetailPage
+              sessionId={selectedSessionId}
+              onBack={() => setSelectedSessionId(null)}
+            />
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen p-4 md:p-6 max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-6">
+              <div>
+                <h1 className="text-lg font-semibold" style={{ color: COLORS.text }}>Token Monitor</h1>
+                <p className="text-xs" style={{ color: COLORS.textMuted }}>Claude Code analytics</p>
+              </div>
+              {/* Tab Navigation */}
+              <div className="flex items-center gap-1 p-1 rounded-lg" style={{ background: COLORS.surface2 }}>
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className={`nav-tab ${activeTab === 'dashboard' ? 'nav-tab-active' : 'nav-tab-inactive'}`}
+                >
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => setActiveTab('pricing')}
+                  className={`nav-tab ${activeTab === 'pricing' ? 'nav-tab-active' : 'nav-tab-inactive'}`}
+                >
+                  Price Estimator
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs" style={{ color: COLORS.textMuted }}>{lastUpdated}</span>
+              <span className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-full font-medium ${
+                connected
+                  ? ''
+                  : ''
+              }`} style={{
+                background: connected ? 'rgba(91, 189, 114, 0.1)' : 'rgba(232, 138, 138, 0.1)',
+                color: connected ? COLORS.green : '#E88A8A',
+                border: `1px solid ${connected ? 'rgba(91, 189, 114, 0.2)' : 'rgba(232, 138, 138, 0.2)'}`
+              }}>
+                <span className={`w-1.5 h-1.5 rounded-full ${connected ? '' : 'pulse'}`}
+                  style={{ background: connected ? COLORS.green : '#E88A8A' }} />
+                {connected ? 'Live' : 'Reconnecting'}
+              </span>
+            </div>
+          </div>
+
+          {activeTab === 'pricing' ? (
+            <PriceEstimator stats={stats} />
+          ) : (
+            <>
+              {/* Stats Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <StatCard
+                  title="Total Tokens"
+                  value={formatNumber(stats.totalTokens)}
+                  subtitle="All time usage"
+                  icon={Icons.activity}
+                  accent
+                />
+                <StatCard
+                  title="Input"
+                  value={formatNumber(stats.inputTokens)}
+                  subtitle="Sent to Claude"
+                  icon={Icons.arrowUp}
+                />
+                <StatCard
+                  title="Output"
+                  value={formatNumber(stats.outputTokens)}
+                  subtitle="Generated responses"
+                  icon={Icons.arrowDown}
+                />
+                <StatCard
+                  title="Cache Hit"
+                  value={`${stats.cacheEfficiency.toFixed(0)}%`}
+                  subtitle={`${formatNumber(stats.cacheReadTokens)} saved`}
+                  icon={Icons.zap}
+                />
+              </div>
+
+              {/* Time Range Controls */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex gap-1">
+                  {['daily', 'weekly', 'all'].map(range => (
+                    <button
+                      key={range}
+                      onClick={() => setTimeRange(range)}
+                      className={`range-btn ${timeRange === range ? 'range-btn-active' : 'range-btn-inactive'}`}
+                    >
+                      {range === 'daily' ? '7 Days' : range === 'weekly' ? '30 Days' : 'All Time'}
+                    </button>
+                  ))}
+                </div>
+                <div className="text-xs" style={{ color: COLORS.textMuted }}>
+                  {filteredStats.sessions} sessions • {formatNumber(filteredStats.messages)} messages
+                </div>
+              </div>
+
+              {/* Timeline Chart */}
+              <div className="card p-5 mb-6">
+                <SectionHeader
+                  icon={Icons.trendingUp}
+                  title="Usage Trends"
+                  description="Token consumption over time"
+                />
+                <TokenTimeline
+                  dailyModelTokens={stats.dailyModelTokens}
+                  dailyActivity={stats.dailyActivity}
+                  timeRange={timeRange}
+                  viewMode={viewMode}
+                  setViewMode={setViewMode}
+                />
+              </div>
+
+              {/* Session Growth Chart */}
+              <div className="card p-5 mb-6">
+                <SectionHeader
+                  icon={Icons.growth}
+                  title="Session Token Growth"
+                  description="How token usage evolves within a chat"
+                />
+                <SessionGrowth sessions={stats.sessions} />
+              </div>
+
+              {/* Peak Hours */}
+              <div className="card p-5 mb-6">
+                <SectionHeader
+                  icon={Icons.grid}
+                  title="Peak Hours"
+                  description="When you're most active"
+                />
+                <PeakHours hourlyActivity={stats.hourlyActivity} />
+              </div>
+
+              {/* Project Activity and Model Comparison */}
+              <div className="grid lg:grid-cols-3 gap-4 mb-6">
+                <div className="lg:col-span-2 card p-5 min-w-0">
+                  <SectionHeader
+                    icon={Icons.barChart}
+                    title="Project Activity"
+                    description="Token usage by project"
+                  />
+                  <SessionTimeline sessions={stats.sessions} timeRange={timeRange} />
+                </div>
+                <div className="card p-5 min-w-0">
+                  <SectionHeader
+                    icon={Icons.layers}
+                    title="Models"
+                    description="Input vs output"
+                  />
+                  <ModelComparison modelUsage={stats.modelUsage} />
+                </div>
+              </div>
+
+              {/* Session Race */}
+              <div className="card p-5 mb-6 min-w-0">
+                <SectionHeader
+                  icon={Icons.race}
+                  title="Session Race"
+                  description="Watch sessions grow in real-time"
+                />
+                <SessionRace sessions={stats.sessions} viewMode={raceViewMode} setViewMode={setRaceViewMode} />
+              </div>
+
+              {/* Sessions */}
+              <div className="card p-5">
+                <SectionHeader
+                  icon={Icons.clock}
+                  title="Recent Sessions"
+                  description="Click a session for message details, or the chart icon for progression"
+                />
+                <SessionList
+                  sessions={stats.sessions}
+                  onProjectClick={handleProjectClick}
+                  onSessionClick={handleSessionDetailClick}
+                />
+              </div>
+
+              {/* Project Progression Modal */}
+              <Modal isOpen={selectedProject !== null} onClose={() => setSelectedProject(null)}>
+                {selectedProject && (
+                  <SessionProgressionModal
+                    sessions={selectedProject.sessions}
+                    projectName={selectedProject.projectName}
+                    onClose={() => setSelectedProject(null)}
+                  />
+                )}
+              </Modal>
+            </>
+          )}
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
