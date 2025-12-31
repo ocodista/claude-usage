@@ -93,3 +93,15 @@ export interface WebSocketMessage {
 }
 
 export type TimeRange = "daily" | "weekly" | "all"
+
+export type TimeRangePreset = "1W" | "1M" | "YTD" | "All" | "custom"
+
+export interface CustomDateRange {
+  startDate: string // ISO 8601 date string
+  endDate: string   // ISO 8601 date string
+}
+
+export interface TimeRangeState {
+  preset: TimeRangePreset
+  customRange?: CustomDateRange
+}

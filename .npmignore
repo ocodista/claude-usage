@@ -1,0 +1,17 @@
+node_modules/
+.git/
+.gitignore
+*.log
+.DS_Store
+.env
+.env.*
+tests/
+*.test.ts
+tsconfig.json
+build.ts
+ARCHITECTURE_REVIEW.md
+how-it-works.md
+improvements.md
+distribution.md
+.claude-plugin/
+.github/

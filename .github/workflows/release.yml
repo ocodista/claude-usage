@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build Binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: darwin-arm64
+          - os: macos-13
+            target: darwin-x64
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: windows-latest
+            target: windows-x64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build client
+        run: bun run build:client
+
+      - name: Build binary
+        run: bun run build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-usage-${{ matrix.target }}
+          path: dist/claude-usage-${{ matrix.target }}*
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/**/*
+          body: |
+            ## Installation
+
+            ### NPM
+            ```bash
+            npx @ocodista/claude-usage start
+            ```
+
+            ### Binary (one-liner)
+            ```bash
+            curl -fsSL ocodista.com/claude-usage.sh | sh
+            ```
+
+            ### Manual Download
+            Download the binary for your platform below and run:
+            ```bash
+            chmod +x claude-usage-*
+            ./claude-usage-* start
+            ```
+
+            ## What's Changed
+            See [CHANGELOG.md](https://github.com/ocodista/claude-usage/blob/main/CHANGELOG.md)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,11 +1,24 @@
 import { readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { SessionInfo, StatsCache, TokenStats } from "../client/types"
+import { sessionCache } from "./session-cache"
 
 const CLAUDE_DIR = join(process.env.HOME ?? "", ".claude")
 const STATS_FILE = join(CLAUDE_DIR, "stats-cache.json")
 const PROJECTS_DIR = join(CLAUDE_DIR, "projects")
 const HISTORY_FILE = join(CLAUDE_DIR, "history.jsonl")
+
+interface ParseError {
+  sessionId: string
+  error: string
+  timestamp: string
+}
+
+const parseErrors: ParseError[] = []
+
+export function getParseErrors(): ParseError[] {
+  return parseErrors.slice(-10)  // Last 10 errors
+}
 
 // Anthropic pricing per 1M tokens (as of Dec 2024)
 const PRICING = {
@@ -96,6 +109,118 @@ interface SessionMessage {
   cwd?: string
 }
 
+async function parseSessionFile(
+  filePath: string,
+  sessionId: string,
+  projectDir: string,
+  historyMap: Map<string, HistoryEntry>,
+  currentSessionId: string | undefined,
+  now: number
+): Promise<SessionInfo | null> {
+  try {
+    const content = await readFile(filePath, "utf-8")
+    const lines = content.trim().split("\n")
+
+    let inputTokens = 0
+    let outputTokens = 0
+    let cacheReadTokens = 0
+    let cacheWriteTokens = 0
+    let messageCount = 0
+    let model = ""
+    let startTime = ""
+    let lastActivity = ""
+    let project = decodeURIComponent(projectDir).replace(/%/g, "/")
+    let branch = ""
+    const tokenTimeline: Array<{ timestamp: string; inputTokens: number; outputTokens: number; totalTokens: number }> = []
+
+    for (const line of lines) {
+      if (!line) continue
+      try {
+        const msg = JSON.parse(line) as SessionMessage
+        messageCount++
+
+        if (msg.timestamp) {
+          if (!startTime) startTime = msg.timestamp
+          lastActivity = msg.timestamp
+        }
+
+        if (msg.type === "assistant" && msg.message?.usage) {
+          const usage = msg.message.usage
+          inputTokens += usage.input_tokens ?? 0
+          outputTokens += usage.output_tokens ?? 0
+          cacheReadTokens += usage.cache_read_input_tokens ?? 0
+          cacheWriteTokens += usage.cache_creation_input_tokens ?? 0
+
+          // Record cumulative tokens at this timestamp
+          if (msg.timestamp) {
+            tokenTimeline.push({
+              timestamp: msg.timestamp,
+              inputTokens,
+              outputTokens,
+              totalTokens: inputTokens + outputTokens
+            })
+          }
+        }
+
+        if (msg.type === "assistant" && msg.message?.model && !model) {
+          model = msg.message.model
+        }
+
+        if (msg.gitBranch && !branch) {
+          branch = msg.gitBranch
+        }
+        if (msg.cwd && project.includes("%")) {
+          project = msg.cwd
+        }
+      } catch {
+        continue
+      }
+    }
+
+    const historyEntry = historyMap.get(sessionId)
+    if (historyEntry?.project) {
+      project = historyEntry.project
+    }
+
+    if (messageCount > 0) {
+      const costUSD = calculateCost(
+        model || "default",
+        inputTokens,
+        outputTokens,
+        cacheReadTokens,
+        cacheWriteTokens
+      )
+
+      const lastActivityTime = new Date(lastActivity).getTime()
+      const isCurrentSession = currentSessionId
+        ? sessionId === currentSessionId
+        : (now - lastActivityTime) < 5 * 60 * 1000
+
+      return {
+        sessionId,
+        project,
+        branch: branch || undefined,
+        messageCount,
+        totalTokens: inputTokens + outputTokens,
+        inputTokens,
+        outputTokens,
+        cacheTokens: cacheReadTokens,
+        cacheWriteTokens,
+        model: model || "unknown",
+        startTime,
+        lastActivity,
+        costUSD,
+        isCurrentSession,
+        tokenTimeline: tokenTimeline.length > 0 ? tokenTimeline : undefined,
+      }
+    }
+
+    return null
+  } catch {
+    return null
+  }
+}
+
 export async function parseSessions(currentSessionId?: string): Promise<SessionInfo[]> {
   const sessions: SessionInfo[] = []
   const historyMap = await parseHistoryFile()
@@ -117,104 +242,31 @@ export async function parseSessions(currentSessionId?: string): Promise<SessionI
           const filePath = join(projectPath, file)
 
           try {
-            const content = await readFile(filePath, "utf-8")
-            const lines = content.trim().split("\n")
+            // Check cache first
+            const stat = await Bun.file(filePath).stat()
+            const cached = await sessionCache.get(sessionId, filePath)
 
-            let inputTokens = 0
-            let outputTokens = 0
-            let cacheReadTokens = 0
-            let cacheWriteTokens = 0
-            let messageCount = 0
-            let model = ""
-            let startTime = ""
-            let lastActivity = ""
-            let project = decodeURIComponent(projectDir).replace(/%/g, "/")
-            let branch = ""
-            const tokenTimeline: Array<{ timestamp: string; inputTokens: number; outputTokens: number; totalTokens: number }> = []
-
-            for (const line of lines) {
-              if (!line) continue
-              try {
-                const msg = JSON.parse(line) as SessionMessage
-                messageCount++
-
-                if (msg.timestamp) {
-                  if (!startTime) startTime = msg.timestamp
-                  lastActivity = msg.timestamp
-                }
-
-                if (msg.type === "assistant" && msg.message?.usage) {
-                  const usage = msg.message.usage
-                  inputTokens += usage.input_tokens ?? 0
-                  outputTokens += usage.output_tokens ?? 0
-                  cacheReadTokens += usage.cache_read_input_tokens ?? 0
-                  cacheWriteTokens += usage.cache_creation_input_tokens ?? 0
-
-                  // Record cumulative tokens at this timestamp
-                  if (msg.timestamp) {
-                    tokenTimeline.push({
-                      timestamp: msg.timestamp,
-                      inputTokens,
-                      outputTokens,
-                      totalTokens: inputTokens + outputTokens
-                    })
-                  }
-                }
-
-                if (msg.type === "assistant" && msg.message?.model && !model) {
-                  model = msg.message.model
-                }
-
-                if (msg.gitBranch && !branch) {
-                  branch = msg.gitBranch
-                }
-                if (msg.cwd && project.includes("%")) {
-                  project = msg.cwd
-                }
-              } catch {
-                continue
-              }
+            if (cached) {
+              sessions.push(cached)
+              continue
             }
 
-            const historyEntry = historyMap.get(sessionId)
-            if (historyEntry?.project) {
-              project = historyEntry.project
+            // Cache miss - parse file
+            const session = await parseSessionFile(filePath, sessionId, projectDir, historyMap, currentSessionId, now)
+
+            if (session) {
+              sessionCache.set(sessionId, session, filePath, stat.mtime.getTime())
+              sessions.push(session)
             }
-
-            if (messageCount > 0) {
-              const costUSD = calculateCost(
-                model || "default",
-                inputTokens,
-                outputTokens,
-                cacheReadTokens,
-                cacheWriteTokens
-              )
-
-              const lastActivityTime = new Date(lastActivity).getTime()
-              const isCurrentSession = currentSessionId
-                ? sessionId === currentSessionId
-                : (now - lastActivityTime) < 5 * 60 * 1000
-
-              sessions.push({
-                sessionId,
-                project,
-                branch: branch || undefined,
-                messageCount,
-                totalTokens: inputTokens + outputTokens,
-                inputTokens,
-                outputTokens,
-                cacheTokens: cacheReadTokens,
-                cacheWriteTokens,
-                model: model || "unknown",
-                startTime,
-                lastActivity,
-                costUSD,
-                isCurrentSession,
-                // Include timeline data for all sessions (will be trimmed later for non-recent)
-                tokenTimeline: tokenTimeline.length > 0 ? tokenTimeline : undefined,
-              })
-            }
-          } catch {
+          } catch (error) {
+            // Log error but continue parsing other sessions
+            const errorMsg = error instanceof Error ? error.message : String(error)
+            parseErrors.push({
+              sessionId,
+              error: errorMsg,
+              timestamp: new Date().toISOString()
+            })
+            console.error(`[Parser] Failed to parse session ${sessionId}:`, errorMsg)
             continue
           }
         }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,41 +9,32 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
           colors: {
-            // Anthropic-inspired palette
-            claude: {
-              coral: '#D97757',
-              'coral-dim': '#B8624A',
-              orange: '#E8956A',
-              cream: '#FAF6F1',
-            },
+            // Clean dark palette
             surface: {
-              '0': '#0D0D0D',
-              '1': '#141414',
-              '2': '#1A1A1A',
-              '3': '#212121',
-              '4': '#2A2A2A',
+              0: '#09090B', // Page background
+              1: '#18181B', // Cards
+              2: '#27272A', // Hover
+              3: '#3F3F46', // Borders
             },
-            text: {
-              primary: '#F5F5F5',
-              secondary: '#A3A3A3',
-              muted: '#6B6B6B',
-            },
-            border: {
-              DEFAULT: '#2A2A2A',
-              subtle: '#1F1F1F',
-            },
-            accent: {
-              blue: '#5B9DD9',
-              green: '#5BBD72',
-              purple: '#9D7CD8',
-              amber: '#E5A855',
+            border: '#27272A',
+            claude: {
+              coral: '#D97706',   // Anthropic orange
+              blue: '#60A5FA',    // Input
+              green: '#4ADE80',   // Cache
+              purple: '#A78BFA',  // Output
+              amber: '#FBBF24',   // Warnings
             }
           }
         }
@@ -52,116 +43,217 @@
   </script>
   <style>
     * { box-sizing: border-box; }
+
+    /* Custom scrollbar - Dark theme */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #18181B; }
+    ::-webkit-scrollbar-thumb { background: #3F3F46; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #52525B; }
+
     body {
-      background: #0D0D0D;
-      color: #F5F5F5;
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: #09090B;
+      color: #FAFAFA;
+      font-family: 'Inter', system-ui, sans-serif;
       min-height: 100vh;
     }
+
+    /* Clean card style - Dark */
     .card {
-      background: #141414;
-      border: 1px solid #1F1F1F;
+      background: #18181B;
+      border: 1px solid #27272A;
       border-radius: 12px;
       overflow: hidden;
+      transition: box-shadow 0.2s ease, border-color 0.2s ease;
     }
+
+    .card:hover {
+      border-color: #3F3F46;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
     .card-highlight {
-      border-color: #D97757;
-      background: linear-gradient(145deg, rgba(217, 119, 87, 0.08) 0%, #141414 100%);
+      border-color: #D97706;
+      background: linear-gradient(135deg, rgba(217, 119, 6, 0.08) 0%, #18181B 100%);
     }
+
+    /* Horizontal scroll with snap */
+    .snap-scroll {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      gap: 12px;
+      padding-bottom: 8px;
+    }
+    .snap-scroll::-webkit-scrollbar { height: 4px; }
+    .snap-scroll::-webkit-scrollbar-thumb { background: #3F3F46; border-radius: 2px; }
+    .snap-scroll > * {
+      scroll-snap-align: start;
+      flex-shrink: 0;
+    }
+
+    /* Accordion animations */
+    .accordion-content {
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+    .accordion-chevron {
+      transition: transform 0.2s ease;
+    }
+    .accordion-chevron.open {
+      transform: rotate(180deg);
+    }
+
+    /* GitHub-style contribution colors (orange scale - dark theme) */
+    .activity-level-0 { background: #27272A; }
+    .activity-level-1 { background: #78350F; }
+    .activity-level-2 { background: #92400E; }
+    .activity-level-3 { background: #B45309; }
+    .activity-level-4 { background: #D97706; }
+
     .stat-value {
       font-variant-numeric: tabular-nums;
       letter-spacing: -0.02em;
       font-weight: 600;
+      color: #FAFAFA;
     }
+
     .nav-tab {
-      padding: 8px 16px;
-      border-radius: 8px;
+      padding: 10px 16px;
       font-size: 14px;
       font-weight: 500;
       transition: all 0.15s ease;
       cursor: pointer;
+      border-bottom: 2px solid transparent;
+      color: #71717A;
     }
+
+    .nav-tab:hover {
+      color: #A1A1AA;
+    }
+
     .nav-tab-active {
-      background: #D97757;
-      color: #0D0D0D;
+      color: #FAFAFA;
+      border-bottom-color: #D97706;
     }
-    .nav-tab-inactive {
-      background: transparent;
-      color: #6B6B6B;
-    }
-    .nav-tab-inactive:hover {
-      background: #1A1A1A;
-      color: #A3A3A3;
-    }
+
     .range-btn {
-      padding: 6px 12px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s ease;
       border-radius: 6px;
-      font-size: 12px;
-      font-weight: 500;
-      transition: all 0.15s ease;
+      color: #71717A;
     }
+
+    .range-btn:hover {
+      background: #27272A;
+      color: #FAFAFA;
+    }
+
     .range-btn-active {
-      background: #2A2A2A;
-      color: #F5F5F5;
+      background: #27272A;
+      color: #FAFAFA;
     }
-    .range-btn-inactive {
-      background: transparent;
-      color: #6B6B6B;
-    }
-    .range-btn-inactive:hover {
-      background: #1A1A1A;
-      color: #A3A3A3;
-    }
+
     .toggle-btn {
-      padding: 4px 10px;
-      border-radius: 4px;
-      font-size: 11px;
+      padding: 6px 12px;
+      font-size: 13px;
       font-weight: 500;
       transition: all 0.15s ease;
-      border: 1px solid transparent;
+      border: 1px solid #3F3F46;
+      border-radius: 6px;
+      background: #18181B;
+      color: #A1A1AA;
     }
+
+    .toggle-btn:hover {
+      border-color: #52525B;
+      color: #FAFAFA;
+    }
+
     .toggle-btn-active {
-      background: #1A1A1A;
-      border-color: #2A2A2A;
-      color: #F5F5F5;
+      background: #D97706;
+      border-color: #D97706;
+      color: #FAFAFA;
     }
-    .toggle-btn-inactive {
-      background: transparent;
-      color: #6B6B6B;
+
+    .session-item {
+      transition: all 0.15s ease;
+      background: #18181B;
+      border-radius: 8px;
     }
-    .toggle-btn-inactive:hover {
-      color: #A3A3A3;
+
+    .session-item:hover {
+      background: #27272A;
     }
-    .session-item { transition: background 0.15s ease; }
-    .session-item:hover { background: #1A1A1A; }
-    .pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #2A2A2A; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #3A3A3A; }
+
+    .rank-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      font-weight: 600;
+      font-size: 12px;
+      flex-shrink: 0;
+      background: #27272A;
+      border-radius: 6px;
+      color: #A1A1AA;
+    }
+
+    .rank-badge.top {
+      background: #D97706;
+      color: #FAFAFA;
+    }
+
+    /* Tab styles for sidebar */
+    .sidebar-tab {
+      flex: 1;
+      padding: 12px 0;
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+      border-bottom: 2px solid transparent;
+      color: #71717A;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .sidebar-tab:hover {
+      color: #A1A1AA;
+    }
+    .sidebar-tab.active {
+      color: #FAFAFA;
+      border-bottom-color: #D97706;
+    }
+
+    .cursor-pointer { cursor: pointer; }
+
+    .pulse-slow { animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     .section-header {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 16px;
+      gap: 8px;
+      margin-bottom: 12px;
     }
     .section-title {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 600;
-      color: #F5F5F5;
+      color: #FAFAFA;
+      letter-spacing: 0.01em;
     }
     .section-desc {
-      font-size: 12px;
-      color: #6B6B6B;
+      font-size: 11px;
+      color: #71717A;
     }
     .icon { width: 16px; height: 16px; stroke-width: 1.5; }
-    .divider { height: 1px; background: #1F1F1F; }
-    /* Modal styles */
+    .divider { height: 1px; background: #27272A; }
+    /* Modal styles - Dark theme */
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(0, 0, 0, 0.7);
       backdrop-filter: blur(4px);
       z-index: 100;
       animation: fadeIn 0.15s ease;
@@ -176,6 +268,10 @@
       max-width: 700px;
       max-height: 85vh;
       overflow-y: auto;
+      background: #18181B;
+      border: 1px solid #27272A;
+      border-radius: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
       animation: slideIn 0.2s ease;
     }
     @keyframes fadeIn {
@@ -219,6 +315,28 @@
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
 
+    const formatDuration = (startDateStr, endDateStr) => {
+      const start = new Date(startDateStr);
+      const end = new Date(endDateStr);
+      const diffMs = end.getTime() - start.getTime();
+
+      if (diffMs < 0) return '0m';
+
+      const minutes = Math.floor(diffMs / (1000 * 60));
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+
+      if (days > 0) {
+        const remainingHours = hours % 24;
+        return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+      }
+      if (hours > 0) {
+        const remainingMins = minutes % 60;
+        return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`;
+      }
+      return `${minutes}m`;
+    };
+
     const getModelDisplayName = (model) => {
       if (model.includes('opus')) return 'Opus 4.5';
       if (model.includes('sonnet')) return 'Sonnet 4.5';
@@ -227,28 +345,144 @@
     };
 
     const getModelColor = (model) => {
-      if (model.includes('opus')) return '#D97757';  // Anthropic coral
-      if (model.includes('sonnet')) return '#5B9DD9'; // Accent blue
-      if (model.includes('haiku')) return '#5BBD72';  // Accent green
-      return '#6B6B6B';
+      if (model.includes('opus')) return '#D97706';  // Anthropic orange
+      if (model.includes('sonnet')) return '#3B82F6'; // Blue
+      if (model.includes('haiku')) return '#22C55E';  // Green
+      return '#71717a';
     };
 
-    // Theme colors
+    // Theme colors - Clean dark theme
     const COLORS = {
-      coral: '#D97757',
-      blue: '#5B9DD9',
-      green: '#5BBD72',
-      purple: '#9D7CD8',
-      amber: '#E5A855',
-      text: '#F5F5F5',
-      textSecondary: '#A3A3A3',
-      textMuted: '#6B6B6B',
-      surface0: '#0D0D0D',
-      surface1: '#141414',
-      surface2: '#1A1A1A',
-      surface3: '#212121',
-      border: '#2A2A2A',
-      borderSubtle: '#1F1F1F',
+      coral: '#D97706',    // Anthropic orange (amber-600)
+      blue: '#60A5FA',     // Input (blue-400)
+      green: '#4ADE80',    // Cache (green-400)
+      purple: '#A78BFA',   // Output (violet-400)
+      amber: '#FBBF24',    // Warnings (amber-400)
+      text: '#FAFAFA',     // Primary text
+      textSecondary: '#A1A1AA', // zinc-400
+      textMuted: '#71717A',    // zinc-500
+      surface0: '#09090B', // Page background (zinc-950)
+      surface1: '#18181B', // Cards (zinc-900)
+      surface2: '#27272A', // Hover (zinc-800)
+      surface3: '#3F3F46', // Borders (zinc-700)
+      border: '#27272A',   // zinc-800
+      borderSubtle: '#3F3F46',
+    };
+
+    // Chart styling utilities - Light theme
+    const CHART_COLORS = {
+      primary: ['#D97706', '#3B82F6', '#22C55E', '#F59E0B', '#8B5CF6'],
+      models: {
+        'opus': '#D97706',
+        'sonnet': '#3B82F6',
+        'haiku': '#22C55E',
+      },
+      tokenTypes: {
+        input: '#3B82F6',
+        output: '#8B5CF6',
+        cache: '#22C55E',
+        total: '#D97706'
+      }
+    };
+
+    const getStandardTooltip = () => ({
+      trigger: 'axis',
+      backgroundColor: COLORS.surface1,
+      borderColor: COLORS.border,
+      borderWidth: 1,
+      textStyle: {
+        color: COLORS.text,
+        fontSize: 11,
+        fontFamily: 'Inter, system-ui, sans-serif'
+      },
+      padding: 12,
+      extraCssText: 'border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);'
+    });
+
+    const getStandardLegend = (data) => ({
+      data,
+      textStyle: {
+        color: COLORS.textSecondary,
+        fontSize: 11,
+        fontFamily: 'Inter, system-ui, sans-serif'
+      },
+      itemGap: 12,
+      itemWidth: 12,
+      itemHeight: 8,
+      type: data.length > 6 ? 'scroll' : 'plain',
+      pageButtonItemGap: 4,
+      pageIconColor: COLORS.coral,
+      pageIconInactiveColor: COLORS.textMuted,
+      pageTextStyle: { color: COLORS.textSecondary, fontSize: 11 }
+    });
+
+    const getStandardGrid = () => ({
+      left: 55,
+      right: 25,
+      top: 45,
+      bottom: 65
+    });
+
+    // Date filtering utilities
+    const getDateRangeBounds = (timeRangeState) => {
+      const now = new Date();
+      const { preset, customRange } = timeRangeState;
+
+      let startDate = null;
+      let endDate = now;
+
+      switch (preset) {
+        case '1W':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case '1M':
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case 'YTD':
+          startDate = new Date(now.getFullYear(), 0, 1); // Jan 1 of current year
+          break;
+        case 'All':
+          // All time - no filter
+          startDate = null;
+          break;
+        case 'custom':
+          if (customRange?.startDate && customRange?.endDate) {
+            startDate = new Date(customRange.startDate);
+            endDate = new Date(customRange.endDate);
+            // Set endDate to end of day
+            endDate.setHours(23, 59, 59, 999);
+          }
+          break;
+      }
+
+      return { startDate, endDate };
+    };
+
+    const filterSessionsByDateRange = (sessions, timeRangeState) => {
+      const { startDate, endDate } = getDateRangeBounds(timeRangeState);
+
+      if (!startDate) {
+        // No filter - return all sessions
+        return sessions;
+      }
+
+      return sessions.filter(session => {
+        const sessionDate = new Date(session.lastActivity);
+        return sessionDate >= startDate && sessionDate <= endDate;
+      });
+    };
+
+    const filterDailyDataByRange = (dailyData, timeRangeState) => {
+      const { startDate, endDate } = getDateRangeBounds(timeRangeState);
+
+      if (!startDate) {
+        return dailyData; // No filter
+      }
+
+      return dailyData.filter(item => {
+        const itemDate = new Date(item.date);
+        return itemDate >= startDate && itemDate <= endDate;
+      });
     };
 
     // WebSocket hook
@@ -261,6 +495,7 @@
         hourlyActivity: [], sessions: [], currentSession: null
       });
       const [connected, setConnected] = useState(false);
+      const [isInitialLoad, setIsInitialLoad] = useState(true);
 
       const connect = useCallback(() => {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -272,6 +507,9 @@
             const message = JSON.parse(event.data);
             if (message.type === 'initial' || message.type === 'stats_update') {
               setStats(message.data);
+              if (message.type === 'initial') {
+                setIsInitialLoad(false);
+              }
             }
           } catch (err) { console.error('Parse error:', err); }
         };
@@ -288,7 +526,206 @@
         return () => ws.close();
       }, [connect]);
 
-      return { stats, connected };
+      return { stats, connected, isInitialLoad };
+    };
+
+    // Loading Screen with Three.js Rocket Animation
+    const LoadingScreen = () => {
+      const canvasRef = useRef(null);
+      const sceneRef = useRef(null);
+
+      useEffect(() => {
+        if (!canvasRef.current || !window.THREE) return;
+
+        const THREE = window.THREE;
+        const canvas = canvasRef.current;
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+        camera.position.z = 8;
+
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // Rocket body (cone + cylinder)
+        const rocketGroup = new THREE.Group();
+
+        // Body
+        const bodyGeometry = new THREE.CylinderGeometry(0.4, 0.5, 2, 16);
+        const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0xD97706, shininess: 100 });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        rocketGroup.add(body);
+
+        // Nose cone
+        const noseGeometry = new THREE.ConeGeometry(0.4, 0.8, 16);
+        const noseMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 100 });
+        const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+        nose.position.y = 1.4;
+        rocketGroup.add(nose);
+
+        // Window
+        const windowGeometry = new THREE.CircleGeometry(0.15, 16);
+        const windowMaterial = new THREE.MeshPhongMaterial({ color: 0x60A5FA, shininess: 100 });
+        const rocketWindow = new THREE.Mesh(windowGeometry, windowMaterial);
+        rocketWindow.position.set(0, 0.3, 0.41);
+        rocketGroup.add(rocketWindow);
+
+        // Fins
+        const finGeometry = new THREE.BoxGeometry(0.1, 0.6, 0.4);
+        const finMaterial = new THREE.MeshPhongMaterial({ color: 0xA78BFA });
+        for (let i = 0; i < 3; i++) {
+          const fin = new THREE.Mesh(finGeometry, finMaterial);
+          const angle = (i * Math.PI * 2) / 3;
+          fin.position.set(Math.sin(angle) * 0.5, -0.8, Math.cos(angle) * 0.5);
+          fin.rotation.y = angle;
+          rocketGroup.add(fin);
+        }
+
+        scene.add(rocketGroup);
+        rocketGroup.rotation.z = -0.3;
+
+        // Flame particles
+        const particleCount = 100;
+        const particleGeometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+        const sizes = new Float32Array(particleCount);
+        const velocities = [];
+
+        for (let i = 0; i < particleCount; i++) {
+          positions[i * 3] = 0;
+          positions[i * 3 + 1] = -1.5;
+          positions[i * 3 + 2] = 0;
+          colors[i * 3] = 1;
+          colors[i * 3 + 1] = 0.6;
+          colors[i * 3 + 2] = 0;
+          sizes[i] = Math.random() * 0.2 + 0.1;
+          velocities.push({
+            x: (Math.random() - 0.5) * 0.1,
+            y: -Math.random() * 0.3 - 0.2,
+            z: (Math.random() - 0.5) * 0.1,
+            life: Math.random()
+          });
+        }
+
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const particleMaterial = new THREE.PointsMaterial({
+          size: 0.15,
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.8,
+          blending: THREE.AdditiveBlending
+        });
+
+        const particles = new THREE.Points(particleGeometry, particleMaterial);
+        scene.add(particles);
+
+        // Stars
+        const starGeometry = new THREE.BufferGeometry();
+        const starPositions = new Float32Array(200 * 3);
+        for (let i = 0; i < 200; i++) {
+          starPositions[i * 3] = (Math.random() - 0.5) * 30;
+          starPositions[i * 3 + 1] = (Math.random() - 0.5) * 30;
+          starPositions[i * 3 + 2] = -10 + Math.random() * 5;
+        }
+        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.05 });
+        const stars = new THREE.Points(starGeometry, starMaterial);
+        scene.add(stars);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        const pointLight = new THREE.PointLight(0xffffff, 1.5);
+        pointLight.position.set(5, 5, 5);
+        scene.add(pointLight);
+        const flameLight = new THREE.PointLight(0xff6600, 2, 5);
+        flameLight.position.set(0, -2, 0);
+        scene.add(flameLight);
+
+        // Animation
+        let time = 0;
+        const animate = () => {
+          const animationId = requestAnimationFrame(animate);
+          sceneRef.current = animationId;
+          time += 0.016;
+
+          // Rocket hover
+          rocketGroup.position.y = Math.sin(time * 2) * 0.2;
+          rocketGroup.rotation.z = -0.3 + Math.sin(time * 1.5) * 0.05;
+
+          // Update particles
+          const pos = particles.geometry.attributes.position.array;
+          for (let i = 0; i < particleCount; i++) {
+            const v = velocities[i];
+            v.life -= 0.02;
+            if (v.life <= 0) {
+              pos[i * 3] = (Math.random() - 0.5) * 0.3;
+              pos[i * 3 + 1] = -1.5 + rocketGroup.position.y;
+              pos[i * 3 + 2] = (Math.random() - 0.5) * 0.3;
+              v.life = 1;
+              v.y = -Math.random() * 0.3 - 0.2;
+            } else {
+              pos[i * 3] += v.x;
+              pos[i * 3 + 1] += v.y;
+              pos[i * 3 + 2] += v.z;
+            }
+          }
+          particles.geometry.attributes.position.needsUpdate = true;
+
+          // Flicker flame light
+          flameLight.intensity = 1.5 + Math.random() * 1;
+          flameLight.position.y = -2 + rocketGroup.position.y;
+
+          // Move stars
+          const starPos = stars.geometry.attributes.position.array;
+          for (let i = 0; i < 200; i++) {
+            starPos[i * 3 + 1] += 0.02;
+            if (starPos[i * 3 + 1] > 15) starPos[i * 3 + 1] = -15;
+          }
+          stars.geometry.attributes.position.needsUpdate = true;
+
+          renderer.render(scene, camera);
+        };
+        animate();
+
+        return () => {
+          if (sceneRef.current) cancelAnimationFrame(sceneRef.current);
+          renderer.dispose();
+        };
+      }, []);
+
+      return (
+        <div className="fixed inset-0 flex flex-col items-center justify-center" style={{ background: COLORS.surface0, zIndex: 9999 }}>
+          <canvas ref={canvasRef} style={{ width: '300px', height: '300px' }} />
+          <div className="text-center mt-4 px-6">
+            <h2 className="text-lg font-medium mb-2" style={{ color: COLORS.text }}>
+              One moment please, we're analyzing your Claude Code history.
+            </h2>
+            <div className="flex items-center justify-center gap-2 mt-6 p-4 rounded-lg max-w-md" style={{ background: COLORS.surface2 }}>
+              <span style={{ color: COLORS.green }}>{Icons.shield}</span>
+              <p className="text-xs text-left" style={{ color: COLORS.textMuted }}>
+                All communication is local and not connected to the internet, your data is safe.{' '}
+                <a
+                  href="https://github.com/ocodista/claude-usage"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:no-underline"
+                  style={{ color: COLORS.coral }}
+                >
+                  Check out the repo →
+                </a>
+              </p>
+            </div>
+          </div>
+        </div>
+      );
     };
 
     // ECharts wrapper
@@ -399,10 +836,13 @@
       database: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
       tool: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
       externalLink: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
+      trophy: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" strokeWidth="2" strokeLinecap="round"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" strokeWidth="2" strokeLinecap="round"/><path d="M4 22h16" strokeWidth="2" strokeLinecap="round"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" strokeWidth="2" strokeLinecap="round"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" strokeWidth="2" strokeLinecap="round"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+      lightbulb: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>,
+      shield: <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
     };
 
     // Stats Card
-    const StatCard = ({ title, value, subtitle, icon, accent }) => (
+    const StatCard = ({ title, value, subtitle, icon, accent, secondaryValue, secondaryLabel }) => (
       <div className={`card p-5 ${accent ? 'card-highlight' : ''}`}>
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-medium uppercase tracking-wider" style={{ color: COLORS.textMuted }}>{title}</span>
@@ -410,24 +850,24 @@
         </div>
         <div className="stat-value text-2xl" style={{ color: COLORS.text }}>{value}</div>
         {subtitle && <div className="text-xs mt-1" style={{ color: COLORS.textMuted }}>{subtitle}</div>}
+        {secondaryValue && (
+          <div className="flex items-center gap-1.5 mt-2 pt-2" style={{ borderTop: `1px solid ${COLORS.surface3}` }}>
+            <span className="text-sm font-medium" style={{ color: COLORS.coral }}>{secondaryValue}</span>
+            <span className="text-xs" style={{ color: COLORS.textMuted }}>{secondaryLabel}</span>
+          </div>
+        )}
       </div>
     );
 
     // Token Timeline Chart with toggles
-    const TokenTimeline = ({ dailyModelTokens, dailyActivity, timeRange, viewMode, setViewMode }) => {
+    const TokenTimeline = ({ dailyModelTokens, dailyActivity, timeRangeState, viewMode, setViewMode }) => {
       const filteredData = useMemo(() => {
-        let daysToShow = dailyModelTokens.length;
-        if (timeRange === 'daily') daysToShow = 7;
-        else if (timeRange === 'weekly') daysToShow = 30;
-        return dailyModelTokens.slice(-daysToShow);
-      }, [dailyModelTokens, timeRange]);
+        return filterDailyDataByRange(dailyModelTokens, timeRangeState);
+      }, [dailyModelTokens, timeRangeState]);
 
       const filteredActivity = useMemo(() => {
-        let daysToShow = dailyActivity.length;
-        if (timeRange === 'daily') daysToShow = 7;
-        else if (timeRange === 'weekly') daysToShow = 30;
-        return dailyActivity.slice(-daysToShow);
-      }, [dailyActivity, timeRange]);
+        return filterDailyDataByRange(dailyActivity, timeRangeState);
+      }, [dailyActivity, timeRangeState]);
 
       const option = useMemo(() => {
         if (viewMode === 'models') {
@@ -451,16 +891,17 @@
             backgroundColor: 'transparent',
             tooltip: {
               trigger: 'axis',
-              backgroundColor: COLORS.surface2,
+              backgroundColor: COLORS.surface1,
               borderColor: COLORS.border,
               textStyle: { color: COLORS.text },
+              extraCssText: 'border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);',
               formatter: (params) => {
-                let result = `<div style="font-weight:600;margin-bottom:8px">${params[0].axisValue}</div>`;
+                let result = `<div style="font-weight:600;margin-bottom:8px;color:#FAFAFA">${params[0].axisValue}</div>`;
                 params.forEach(p => {
                   result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
                     <span style="width:8px;height:8px;border-radius:50%;background:${p.color}"></span>
-                    <span style="color:${COLORS.textSecondary}">${p.seriesName}:</span>
-                    <span style="font-weight:500">${formatNumber(p.value)}</span>
+                    <span style="color:#A1A1AA">${p.seriesName}:</span>
+                    <span style="font-weight:500;color:#FAFAFA">${formatNumber(p.value)}</span>
                   </div>`;
                 });
                 return result;
@@ -468,22 +909,30 @@
             },
             legend: {
               data: Array.from(models).map(getModelDisplayName),
-              textStyle: { color: COLORS.textMuted, fontSize: 11 },
+              textStyle: { color: COLORS.textSecondary, fontSize: 11 },
               bottom: 0
             },
-            grid: { left: 55, right: 15, top: 15, bottom: 45 },
+            grid: { left: 60, right: 15, top: 20, bottom: 55 },
             xAxis: {
               type: 'category',
+              name: 'DATE',
+              nameLocation: 'middle',
+              nameGap: 35,
+              nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace' },
               data: filteredData.map(d => new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
               axisLine: { lineStyle: { color: COLORS.borderSubtle } },
-              axisLabel: { color: COLORS.textMuted, fontSize: 11 },
+              axisLabel: { color: COLORS.textMuted, fontSize: 10 },
               axisTick: { show: false }
             },
             yAxis: {
               type: 'value',
+              name: 'TOKENS',
+              nameLocation: 'middle',
+              nameGap: 45,
+              nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace' },
               axisLine: { show: false },
               splitLine: { lineStyle: { color: COLORS.borderSubtle } },
-              axisLabel: { color: COLORS.textMuted, fontSize: 11, formatter: (v) => formatNumber(v) }
+              axisLabel: { color: COLORS.textMuted, fontSize: 10, formatter: (v) => formatNumber(v) }
             },
             series
           };
@@ -503,39 +952,39 @@
             backgroundColor: 'transparent',
             tooltip: {
               trigger: 'axis',
-              backgroundColor: COLORS.surface2,
+              backgroundColor: COLORS.surface1,
               borderColor: COLORS.border,
               textStyle: { color: COLORS.text },
+              extraCssText: 'border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);',
               formatter: (params) => {
-                let result = `<div style="font-weight:600;margin-bottom:8px">${params[0].axisValue}</div>`;
+                let result = `<div style="font-weight:600;margin-bottom:8px;color:#FAFAFA">${params[0].axisValue}</div>`;
                 params.forEach(p => {
                   result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
                     <span style="width:8px;height:8px;border-radius:50%;background:${p.color}"></span>
-                    <span style="color:${COLORS.textSecondary}">${p.seriesName}:</span>
-                    <span style="font-weight:500">${formatNumber(p.value)}</span>
+                    <span style="color:#A1A1AA">${p.seriesName}:</span>
+                    <span style="font-weight:500;color:#FAFAFA">${formatNumber(p.value)}</span>
                   </div>`;
                 });
                 return result;
               }
             },
-            legend: {
-              data: ['Messages', 'Sessions'],
-              textStyle: { color: COLORS.textMuted, fontSize: 11 },
-              bottom: 0
-            },
-            grid: { left: 55, right: 15, top: 15, bottom: 45 },
+            grid: { left: 60, right: 15, top: 20, bottom: 35 },
             xAxis: {
               type: 'category',
               data: dates,
               axisLine: { lineStyle: { color: COLORS.borderSubtle } },
-              axisLabel: { color: COLORS.textMuted, fontSize: 11 },
+              axisLabel: { color: COLORS.textMuted, fontSize: 10 },
               axisTick: { show: false }
             },
             yAxis: {
               type: 'value',
+              name: 'MESSAGES',
+              nameLocation: 'middle',
+              nameGap: 45,
+              nameTextStyle: { color: COLORS.textMuted, fontSize: 10 },
               axisLine: { show: false },
               splitLine: { lineStyle: { color: COLORS.borderSubtle } },
-              axisLabel: { color: COLORS.textMuted, fontSize: 11 }
+              axisLabel: { color: COLORS.textMuted, fontSize: 10 }
             },
             series: [
               {
@@ -544,16 +993,6 @@
                 barWidth: '60%',
                 itemStyle: { color: COLORS.coral, borderRadius: [4, 4, 0, 0] },
                 data: messageData
-              },
-              {
-                name: 'Sessions',
-                type: 'line',
-                smooth: true,
-                symbol: 'circle',
-                symbolSize: 4,
-                lineStyle: { width: 2, color: COLORS.blue },
-                itemStyle: { color: COLORS.blue },
-                data: filteredActivity.map(d => d.sessionCount)
               }
             ]
           };
@@ -562,28 +1001,40 @@
 
       return (
         <div>
-          <div className="flex items-center gap-2 mb-4">
-            <button
-              onClick={() => setViewMode('models')}
-              className={`toggle-btn ${viewMode === 'models' ? 'toggle-btn-active' : 'toggle-btn-inactive'}`}
-            >
-              By Model
-            </button>
-            <button
-              onClick={() => setViewMode('activity')}
-              className={`toggle-btn ${viewMode === 'activity' ? 'toggle-btn-active' : 'toggle-btn-inactive'}`}
-            >
-              Activity
-            </button>
-          </div>
+          <ChartControls>
+            <ToggleButtonGroup
+              options={[
+                { value: 'activity', label: 'Activity' },
+                { value: 'models', label: 'By Model' }
+              ]}
+              value={viewMode}
+              onChange={setViewMode}
+            />
+          </ChartControls>
           <Chart option={option} height={280} />
         </div>
       );
     };
 
     // Model Comparison Chart
-    const ModelComparison = ({ modelUsage }) => {
+    const ModelComparison = ({ sessions, timeRangeState }) => {
       const option = useMemo(() => {
+        // Filter sessions by date range
+        const filteredSessions = filterSessionsByDateRange(sessions, timeRangeState);
+
+        // Rebuild model usage from filtered sessions
+        const modelUsage = {};
+        filteredSessions.forEach(session => {
+          if (!modelUsage[session.model]) {
+            modelUsage[session.model] = {
+              inputTokens: 0,
+              outputTokens: 0
+            };
+          }
+          modelUsage[session.model].inputTokens += session.inputTokens;
+          modelUsage[session.model].outputTokens += session.outputTokens;
+        });
+
         const models = Object.entries(modelUsage);
         if (models.length === 0) return { series: [] };
 
@@ -668,7 +1119,7 @@
             }
           ]
         };
-      }, [modelUsage]);
+      }, [sessions, timeRangeState]);
 
       return <Chart option={option} height={140} />;
     };
@@ -680,30 +1131,27 @@
     ];
 
     // Session Timeline Chart (Token usage over time by session)
-    const SessionTimeline = ({ sessions, timeRange }) => {
-      const option = useMemo(() => {
+    const SessionTimeline = ({ sessions, timeRangeState }) => {
+      const [sortBy, setSortBy] = useState('tokens'); // 'tokens' | 'sessions' | 'recent'
+
+      const { option, projectCount } = useMemo(() => {
         const validSessions = sessions
           .filter(s => s.totalTokens > 0 && s.lastActivity)
           .sort((a, b) => new Date(a.lastActivity).getTime() - new Date(b.lastActivity).getTime());
 
-        if (validSessions.length === 0) return { series: [] };
+        if (validSessions.length === 0) return { option: { series: [] }, projectCount: 0 };
 
-        // Filter by time range
-        const now = new Date();
-        let filteredSessions = validSessions;
-        if (timeRange === 'daily') {
-          const cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          filteredSessions = validSessions.filter(s => new Date(s.lastActivity) >= cutoff);
-        } else if (timeRange === 'weekly') {
-          const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          filteredSessions = validSessions.filter(s => new Date(s.lastActivity) >= cutoff);
-        }
+        // Filter by time range using centralized utility
+        const filteredSessions = filterSessionsByDateRange(validSessions, timeRangeState);
 
-        if (filteredSessions.length === 0) filteredSessions = validSessions.slice(-15);
+        // Fallback to recent sessions if filtered result is empty
+        const sessionsToDisplay = filteredSessions.length > 0
+          ? filteredSessions
+          : validSessions.slice(-15);
 
         // Group sessions by project and aggregate by date
         const projectMap = new Map();
-        filteredSessions.forEach(s => {
+        sessionsToDisplay.forEach(s => {
           const projectName = s.project.split('/').pop() || 'Unknown';
           if (!projectMap.has(projectName)) {
             projectMap.set(projectName, []);
@@ -711,14 +1159,20 @@
           projectMap.get(projectName).push(s);
         });
 
-        // Get top projects by total tokens
+        // Get top projects sorted by selected criteria
         const topProjects = Array.from(projectMap.entries())
           .map(([name, sessions]) => ({
             name,
             sessions,
-            totalTokens: sessions.reduce((sum, s) => sum + s.totalTokens, 0)
+            totalTokens: sessions.reduce((sum, s) => sum + s.totalTokens, 0),
+            sessionCount: sessions.length,
+            lastActivity: Math.max(...sessions.map(s => new Date(s.lastActivity).getTime()))
           }))
-          .sort((a, b) => b.totalTokens - a.totalTokens)
+          .sort((a, b) => {
+            if (sortBy === 'tokens') return b.totalTokens - a.totalTokens;
+            if (sortBy === 'sessions') return b.sessionCount - a.sessionCount;
+            return b.lastActivity - a.lastActivity; // recent
+          })
           .slice(0, 8);
 
         // Get all unique dates
@@ -758,67 +1212,98 @@
           };
         });
 
-        return {
+        const chartOption = {
           backgroundColor: 'transparent',
           tooltip: {
             trigger: 'axis',
             axisPointer: { type: 'shadow' },
-            backgroundColor: 'hsl(240 6% 15%)',
-            borderColor: 'hsl(240 3.7% 20%)',
-            textStyle: { color: '#fff' },
+            backgroundColor: COLORS.surface1,
+            borderColor: COLORS.border,
+            textStyle: { color: COLORS.text },
+            extraCssText: 'border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);',
             formatter: (params) => {
-              let result = `<div style="font-weight:600;margin-bottom:8px">${params[0].axisValue}</div>`;
+              let result = `<div style="font-weight:600;margin-bottom:8px;color:#FAFAFA">${params[0].axisValue}</div>`;
               let total = 0;
               params.filter(p => p.value > 0).forEach(p => {
                 total += p.value;
-                result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0;color:#A1A1AA">
                   <span style="width:10px;height:10px;border-radius:2px;background:${p.color}"></span>
                   <span>${p.seriesName}: ${formatNumber(p.value)}</span>
                 </div>`;
               });
               if (total > 0) {
-                result += `<div style="border-top:1px solid #444;margin-top:8px;padding-top:8px;font-weight:600">Total: ${formatNumber(total)}</div>`;
+                result += `<div style="border-top:1px solid #3F3F46;margin-top:8px;padding-top:8px;font-weight:600;color:#FAFAFA">Total: ${formatNumber(total)}</div>`;
               }
               return result;
             }
           },
           legend: {
             data: series.map(s => s.name),
-            textStyle: { color: '#888', fontSize: 11 },
+            textStyle: { color: COLORS.textMuted, fontSize: 10 },
             bottom: 0,
             type: 'scroll'
           },
-          grid: { left: 50, right: 20, top: 20, bottom: 60 },
+          grid: { left: 60, right: 20, top: 20, bottom: 70 },
           xAxis: {
             type: 'category',
+            name: 'DATE',
+            nameLocation: 'middle',
+            nameGap: 35,
+            nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace' },
             data: sortedDates.map(d => {
               const date = new Date(d);
               return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             }),
-            axisLine: { lineStyle: { color: '#333' } },
-            axisLabel: { color: '#666' }
+            axisLine: { lineStyle: { color: COLORS.borderSubtle } },
+            axisLabel: { color: COLORS.textMuted, fontSize: 10 }
           },
           yAxis: {
             type: 'value',
+            name: 'TOKENS',
+            nameLocation: 'middle',
+            nameGap: 45,
+            nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace' },
             axisLine: { show: false },
-            splitLine: { lineStyle: { color: '#222' } },
-            axisLabel: { color: '#666', formatter: (v) => formatNumber(v) }
+            splitLine: { lineStyle: { color: COLORS.borderSubtle } },
+            axisLabel: { color: COLORS.textMuted, fontSize: 10, formatter: (v) => formatNumber(v) }
           },
           series
         };
-      }, [sessions, timeRange]);
 
-      return <Chart option={option} height={280} />;
+        return { option: chartOption, projectCount: topProjects.length };
+      }, [sessions, timeRangeState, sortBy]);
+
+      return (
+        <div>
+          <ChartControls>
+            <SortButtonGroup
+              options={[
+                { value: 'tokens', label: 'Most Tokens' },
+                { value: 'sessions', label: 'Most Sessions' },
+                { value: 'recent', label: 'Most Recent' }
+              ]}
+              value={sortBy}
+              onChange={setSortBy}
+            />
+            <span className="text-xs" style={{ color: COLORS.textMuted }}>
+              {projectCount} projects
+            </span>
+          </ChartControls>
+          <Chart option={option} height={260} />
+        </div>
+      );
     };
 
     // Session Race Chart - Shows sessions growing over time
-    const SessionRace = ({ sessions, viewMode, setViewMode }) => {
+    const SessionRace = ({ sessions, timeRangeState, viewMode, setViewMode }) => {
       const option = useMemo(() => {
-        // Get recent sessions with activity
-        const recentSessions = sessions
+        // Filter sessions by date range first
+        const filteredSessions = filterSessionsByDateRange(sessions, timeRangeState)
           .filter(s => s.totalTokens > 0 && s.startTime && s.lastActivity)
           .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())
           .slice(0, 8);
+
+        const recentSessions = filteredSessions;
 
         if (recentSessions.length === 0) return { series: [] };
 
@@ -863,19 +1348,26 @@
                   </div>`;
               }
             },
-            grid: { left: 100, right: 30, top: 10, bottom: 20 },
+            grid: { left: 100, right: 30, top: 20, bottom: 40 },
             xAxis: {
               type: 'value',
+              name: 'TOKENS',
+              nameLocation: 'middle',
+              nameGap: 25,
+              nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace' },
               axisLine: { show: false },
               splitLine: { lineStyle: { color: COLORS.borderSubtle } },
               axisLabel: { color: COLORS.textMuted, fontSize: 10, formatter: (v) => formatNumber(v) }
             },
             yAxis: {
               type: 'category',
+              name: 'SESSION',
+              nameLocation: 'start',
+              nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace', padding: [0, 0, 5, 0] },
               data: data.map(d => d.name),
               axisLine: { show: false },
               axisTick: { show: false },
-              axisLabel: { color: COLORS.textSecondary, fontSize: 11 }
+              axisLabel: { color: COLORS.textSecondary, fontSize: 10 }
             },
             series: [{
               type: 'bar',
@@ -952,15 +1444,16 @@
           backgroundColor: 'transparent',
           tooltip: {
             trigger: 'axis',
-            backgroundColor: 'hsl(240 6% 15%)',
-            borderColor: 'hsl(240 3.7% 20%)',
-            textStyle: { color: '#fff' },
+            backgroundColor: COLORS.surface1,
+            borderColor: COLORS.border,
+            textStyle: { color: COLORS.text },
+            extraCssText: 'border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);',
             formatter: (params) => {
               const validParams = params.filter(p => p.value !== null);
               if (validParams.length === 0) return '';
-              let result = `<div style="font-weight:600;margin-bottom:8px">${params[0].axisValueLabel}</div>`;
+              let result = `<div style="font-weight:600;margin-bottom:8px;color:#FAFAFA">${params[0].axisValueLabel}</div>`;
               validParams.sort((a, b) => b.value - a.value).forEach(p => {
-                result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0;color:#A1A1AA">
                   <span style="width:10px;height:10px;border-radius:50%;background:${p.color}"></span>
                   <span>${p.seriesName}: ${formatNumber(p.value)}</span>
                 </div>`;
@@ -968,13 +1461,17 @@
               return result;
             }
           },
-          grid: { left: 50, right: 100, top: 20, bottom: 30 },
+          grid: { left: 60, right: 100, top: 20, bottom: 45 },
           xAxis: {
             type: 'category',
+            name: 'TIME',
+            nameLocation: 'middle',
+            nameGap: 28,
+            nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace' },
             data: timePoints.map(d => d.toLocaleTimeString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })),
-            axisLine: { lineStyle: { color: '#333' } },
+            axisLine: { lineStyle: { color: COLORS.borderSubtle } },
             axisLabel: {
-              color: '#666',
+              color: COLORS.textMuted,
               fontSize: 10,
               interval: Math.floor(numPoints / 5),
               formatter: (value, idx) => {
@@ -988,30 +1485,30 @@
           },
           yAxis: {
             type: 'value',
+            name: 'TOKENS',
+            nameLocation: 'middle',
+            nameGap: 45,
+            nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace' },
             axisLine: { show: false },
-            splitLine: { lineStyle: { color: '#222' } },
-            axisLabel: { color: '#666', formatter: (v) => formatNumber(v) }
+            splitLine: { lineStyle: { color: COLORS.borderSubtle } },
+            axisLabel: { color: COLORS.textMuted, fontSize: 10, formatter: (v) => formatNumber(v) }
           },
           series
         };
-      }, [sessions, viewMode]);
+      }, [sessions, timeRangeState, viewMode]);
 
       return (
         <div>
-          <div className="flex items-center gap-2 mb-4">
-            <button
-              onClick={() => setViewMode('race')}
-              className={`toggle-btn ${viewMode === 'race' ? 'toggle-btn-active' : 'toggle-btn-inactive'}`}
-            >
-              Race
-            </button>
-            <button
-              onClick={() => setViewMode('bar')}
-              className={`toggle-btn ${viewMode === 'bar' ? 'toggle-btn-active' : 'toggle-btn-inactive'}`}
-            >
-              Bar
-            </button>
-          </div>
+          <ChartControls>
+            <ToggleButtonGroup
+              options={[
+                { value: 'race', label: 'Race' },
+                { value: 'bar', label: 'Bar' }
+              ]}
+              value={viewMode}
+              onChange={setViewMode}
+            />
+          </ChartControls>
           <Chart option={option} height={220} />
         </div>
       );
@@ -1029,7 +1526,7 @@
               top: 'middle',
               style: {
                 text: session ? 'No timeline data' : 'No active session',
-                fill: '#666',
+                fill: COLORS.textMuted,
                 fontSize: 14
               }
             }
@@ -1048,13 +1545,14 @@
           backgroundColor: 'transparent',
           tooltip: {
             trigger: 'axis',
-            backgroundColor: '#1f1f2e',
-            borderColor: '#333',
-            textStyle: { color: '#fff' },
+            backgroundColor: COLORS.surface1,
+            borderColor: COLORS.border,
+            textStyle: { color: COLORS.text },
+            extraCssText: 'border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);',
             formatter: (params) => {
-              let result = `<div style="font-weight:600;margin-bottom:8px">${params[0].axisValue}</div>`;
+              let result = `<div style="font-weight:600;margin-bottom:8px;color:#FAFAFA">${params[0].axisValue}</div>`;
               params.forEach(p => {
-                result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0;color:#A1A1AA">
                   <span style="width:10px;height:10px;border-radius:50%;background:${p.color}"></span>
                   <span>${p.seriesName}: ${formatNumber(p.value)}</span>
                 </div>`;
@@ -1064,7 +1562,7 @@
           },
           legend: {
             data: ['Total', 'Output', 'Input'],
-            textStyle: { color: '#888', fontSize: 10 },
+            textStyle: { color: COLORS.textSecondary, fontSize: 10 },
             bottom: 0,
             itemWidth: 12,
             itemHeight: 8
@@ -1073,9 +1571,9 @@
           xAxis: {
             type: 'category',
             data: timeline.map(t => formatTime(t.timestamp)),
-            axisLine: { lineStyle: { color: '#333' } },
+            axisLine: { lineStyle: { color: COLORS.border } },
             axisLabel: {
-              color: '#666',
+              color: COLORS.textMuted,
               fontSize: 9,
               interval: Math.max(0, Math.floor(timeline.length / 5) - 1),
               rotate: 0
@@ -1085,8 +1583,8 @@
           yAxis: {
             type: 'value',
             axisLine: { show: false },
-            splitLine: { lineStyle: { color: '#222' } },
-            axisLabel: { color: '#666', fontSize: 10, formatter: (v) => formatNumber(v) }
+            splitLine: { lineStyle: { color: COLORS.surface3 } },
+            axisLabel: { color: COLORS.textMuted, fontSize: 10, formatter: (v) => formatNumber(v) }
           },
           series: [
             {
@@ -1094,8 +1592,8 @@
               type: 'line',
               smooth: true,
               symbol: 'none',
-              lineStyle: { width: 2, color: '#f59e0b' },
-              areaStyle: { opacity: 0.05, color: '#f59e0b' },
+              lineStyle: { width: 2, color: COLORS.coral },
+              areaStyle: { opacity: 0.08, color: COLORS.coral },
               data: timeline.map(t => t.totalTokens)
             },
             {
@@ -1103,7 +1601,7 @@
               type: 'line',
               smooth: true,
               symbol: 'none',
-              lineStyle: { width: 2, color: '#8b5cf6' },
+              lineStyle: { width: 2, color: COLORS.purple },
               data: timeline.map(t => t.outputTokens)
             },
             {
@@ -1111,7 +1609,7 @@
               type: 'line',
               smooth: true,
               symbol: 'none',
-              lineStyle: { width: 2, color: '#06b6d4' },
+              lineStyle: { width: 2, color: COLORS.blue },
               data: timeline.map(t => t.inputTokens)
             }
           ]
@@ -1123,16 +1621,16 @@
       return (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-400 truncate">{projectName}</span>
+            <span className="text-sm text-zinc-600 truncate">{projectName}</span>
             {session && (
-              <span className="text-xs text-emerald-400 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse" />
+              <span className="text-xs text-amber-600 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 pulse" />
                 Live
               </span>
             )}
           </div>
           {session && (
-            <div className="flex gap-4 text-xs text-gray-500 mb-2">
+            <div className="flex gap-4 text-xs text-zinc-500 mb-2">
               <span>{session.messageCount} messages</span>
               <span>{getModelDisplayName(session.model)}</span>
             </div>
@@ -1143,19 +1641,41 @@
     };
 
     // Peak Hours Heatmap
-    const PeakHours = ({ hourlyActivity }) => {
+    const PeakHours = ({ sessions, timeRangeState }) => {
+      const [metric, setMetric] = useState('messages'); // 'messages' | 'tokens' | 'sessions'
+
       const option = useMemo(() => {
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        // Monday-Sunday order
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         const hours = Array.from({ length: 24 }, (_, i) => i);
 
-        // Build the data matrix [hour, day, count]
+        // Filter sessions by date range
+        const filteredSessions = filterSessionsByDateRange(sessions, timeRangeState);
+
+        // Rebuild hourly activity from filtered sessions
         const dataMap = new Map();
         let maxCount = 1;
 
-        hourlyActivity.forEach(({ day, hour, count }) => {
+        filteredSessions.forEach(session => {
+          // Use lastActivity as proxy (ideally would have per-message timestamps)
+          const date = new Date(session.lastActivity);
+          const hour = date.getHours();
+          // Convert from Sunday=0 to Monday=0 (shift Sunday to end)
+          const jsDay = date.getDay();
+          const day = jsDay === 0 ? 6 : jsDay - 1;
+
           const key = `${hour}-${day}`;
-          dataMap.set(key, (dataMap.get(key) || 0) + count);
-          maxCount = Math.max(maxCount, dataMap.get(key));
+          let value;
+          if (metric === 'tokens') {
+            value = session.totalTokens;
+          } else if (metric === 'sessions') {
+            value = 1;
+          } else {
+            value = session.messageCount;
+          }
+          const count = (dataMap.get(key) || 0) + value;
+          dataMap.set(key, count);
+          maxCount = Math.max(maxCount, count);
         });
 
         // Create full grid with all cells
@@ -1172,23 +1692,31 @@
           backgroundColor: 'transparent',
           tooltip: {
             position: 'top',
-            backgroundColor: '#1f1f2e',
-            borderColor: '#333',
-            textStyle: { color: '#fff' },
+            backgroundColor: COLORS.surface1,
+            borderColor: COLORS.border,
+            textStyle: { color: COLORS.text },
+            extraCssText: 'border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);',
             formatter: (params) => {
               const [hour, day, count] = params.data;
-              return `<div style="font-weight:600">${days[day]} ${hour}:00</div><div>${count} messages</div>`;
+              const label = metric === 'tokens' ? formatNumber(count) + ' tokens' :
+                            metric === 'sessions' ? count + ' sessions' :
+                            count + ' messages';
+              return `<div style="font-weight:600;color:#FAFAFA">${days[day]} ${hour}:00</div><div style="color:#A1A1AA">${label}</div>`;
             }
           },
-          grid: { left: 45, right: 10, top: 10, bottom: 30 },
+          grid: { left: 50, right: 10, top: 15, bottom: 40 },
           xAxis: {
             type: 'category',
+            name: 'HOUR',
+            nameLocation: 'middle',
+            nameGap: 25,
+            nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace' },
             data: hours,
             splitArea: { show: false },
             axisLine: { show: false },
             axisTick: { show: false },
             axisLabel: {
-              color: '#666',
+              color: COLORS.textMuted,
               fontSize: 9,
               interval: 2,
               formatter: (v) => `${v}h`
@@ -1196,11 +1724,14 @@
           },
           yAxis: {
             type: 'category',
+            name: 'DAY',
+            nameLocation: 'start',
+            nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace', padding: [0, 0, 5, 0] },
             data: days,
             splitArea: { show: false },
             axisLine: { show: false },
             axisTick: { show: false },
-            axisLabel: { color: '#888', fontSize: 10 }
+            axisLabel: { color: COLORS.textMuted, fontSize: 10 }
           },
           visualMap: {
             min: 0,
@@ -1208,25 +1739,40 @@
             calculable: false,
             show: false,
             inRange: {
-              color: ['#1a1a2e', '#2d2b55', '#4c3d8f', '#6b4fd4', '#8b5cf6']
+              color: ['#27272A', '#78350F', '#92400E', '#B45309', '#D97706']
             }
           },
           series: [{
             type: 'heatmap',
             data: data,
             itemStyle: {
-              borderColor: '#0d0d14',
+              borderColor: '#18181B',
               borderWidth: 2,
               borderRadius: 3
             },
             emphasis: {
-              itemStyle: { borderColor: '#8b5cf6', borderWidth: 2 }
+              itemStyle: { borderColor: '#D97706', borderWidth: 2 }
             }
           }]
         };
-      }, [hourlyActivity]);
+      }, [sessions, timeRangeState, metric]);
 
-      return <Chart option={option} height={200} />;
+      return (
+        <div>
+          <ChartControls>
+            <ToggleButtonGroup
+              options={[
+                { value: 'messages', label: 'Messages' },
+                { value: 'tokens', label: 'Tokens' },
+                { value: 'sessions', label: 'Sessions' }
+              ]}
+              value={metric}
+              onChange={setMetric}
+            />
+          </ChartControls>
+          <Chart option={option} height={180} />
+        </div>
+      );
     };
 
     // Project Cost Chart
@@ -1253,12 +1799,13 @@
           tooltip: {
             trigger: 'axis',
             axisPointer: { type: 'shadow' },
-            backgroundColor: 'hsl(240 6% 15%)',
-            borderColor: 'hsl(240 3.7% 20%)',
-            textStyle: { color: '#fff' },
+            backgroundColor: COLORS.surface1,
+            borderColor: COLORS.border,
+            textStyle: { color: COLORS.text },
+            extraCssText: 'border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);',
             formatter: (params) => {
-              return `<div style="font-weight:600;margin-bottom:4px">${params[0].name}</div>
-                <div>${formatCurrency(params[0].value)}</div>`;
+              return `<div style="font-weight:600;margin-bottom:4px;color:#FAFAFA">${params[0].name}</div>
+                <div style="color:#A1A1AA">${formatCurrency(params[0].value)}</div>`;
             }
           },
           grid: { left: '30%', right: '15%', top: 10, bottom: 10, containLabel: false },
@@ -1266,30 +1813,30 @@
             type: 'value',
             max: maxCost,
             axisLine: { show: false },
-            splitLine: { lineStyle: { color: '#222' } },
-            axisLabel: { color: '#666', formatter: (v) => formatCurrency(v) }
+            splitLine: { lineStyle: { color: COLORS.surface3 } },
+            axisLabel: { color: COLORS.textMuted, formatter: (v) => formatCurrency(v) }
           },
           yAxis: {
             type: 'category',
             data: sortedProjects.map(([name]) => name.length > 15 ? name.slice(0, 12) + '...' : name),
             axisLine: { show: false },
             axisTick: { show: false },
-            axisLabel: { color: '#999', fontSize: 11 }
+            axisLabel: { color: COLORS.textSecondary, fontSize: 11 }
           },
           series: [{
             type: 'bar',
             barWidth: 16,
             itemStyle: {
               color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-                { offset: 0, color: '#22c55e' },
-                { offset: 1, color: '#06b6d4' }
+                { offset: 0, color: '#22C55E' },
+                { offset: 1, color: '#D97706' }
               ]),
               borderRadius: [0, 4, 4, 0]
             },
             label: {
               show: true,
               position: 'right',
-              color: '#888',
+              color: COLORS.textMuted,
               fontSize: 10,
               formatter: (p) => formatCurrency(p.value)
             },
@@ -1401,12 +1948,16 @@
           },
           legend: {
             data: ['Total', 'Output', 'Input'],
-            textStyle: { color: COLORS.textMuted, fontSize: 11 },
+            textStyle: { color: COLORS.textMuted, fontSize: 10 },
             bottom: 0
           },
-          grid: { left: 55, right: 20, top: 20, bottom: 45 },
+          grid: { left: 60, right: 20, top: 20, bottom: 55 },
           xAxis: {
             type: 'category',
+            name: 'MESSAGE #',
+            nameLocation: 'middle',
+            nameGap: 30,
+            nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace' },
             data: timeline.map((_, i) => `#${i + 1}`),
             axisLine: { lineStyle: { color: COLORS.borderSubtle } },
             axisLabel: { color: COLORS.textMuted, fontSize: 10, interval: Math.max(0, Math.floor(timeline.length / 12) - 1) },
@@ -1414,6 +1965,10 @@
           },
           yAxis: {
             type: 'value',
+            name: 'TOKENS',
+            nameLocation: 'middle',
+            nameGap: 45,
+            nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace' },
             axisLine: { show: false },
             splitLine: { lineStyle: { color: COLORS.borderSubtle } },
             axisLabel: { color: COLORS.textMuted, fontSize: 10, formatter: (v) => formatNumber(v) }
@@ -1496,97 +2051,93 @@
           <div className="mb-6 pr-8">
             <div className="flex items-center gap-3 mb-2">
               <span className="text-xl font-bold" style={{ color: COLORS.coral }}>{projectName}</span>
-              <span className="px-2 py-1 rounded text-xs" style={{ background: COLORS.surface3, color: COLORS.textSecondary }}>
-                {sessions.length} session{sessions.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-            <div className="text-sm" style={{ color: COLORS.textMuted }}>
-              {formatNumber(projectTotals.totalTokens)} total tokens • {projectTotals.messageCount} messages
             </div>
           </div>
 
-          {/* Session Selector */}
-          {sessionsWithTimeline.length > 1 && (
-            <div className="mb-4">
-              <label className="text-xs uppercase tracking-wider mb-2 block" style={{ color: COLORS.textMuted }}>
-                Select Session
-              </label>
-              <select
-                value={selectedSessionId || ''}
-                onChange={(e) => setSelectedSessionId(e.target.value)}
-                className="w-full text-sm px-3 py-2 rounded-lg border appearance-none cursor-pointer"
-                style={{
-                  background: COLORS.surface2,
-                  borderColor: COLORS.border,
-                  color: COLORS.text
-                }}
-              >
-                {sessionsWithTimeline.map(s => {
-                  const date = new Date(s.lastActivity).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                  return (
-                    <option key={s.sessionId} value={s.sessionId}>
-                      {s.sessionId.slice(0, 8)}... • {date} • {s.tokenTimeline?.length || 0} msgs • {formatNumber(s.totalTokens)} tokens
-                      {s.isCurrentSession ? ' ★ Active' : ''}
-                    </option>
-                  );
-                })}
-              </select>
+          {/* Project Overview Stats */}
+          <div className="grid grid-cols-4 gap-3 mb-6">
+            <div className="p-3 rounded-lg text-center" style={{ background: COLORS.surface2 }}>
+              <div className="text-xs uppercase tracking-wider mb-1" style={{ color: COLORS.textMuted }}>Sessions</div>
+              <div className="text-lg font-bold" style={{ color: COLORS.text }}>{sessions.length}</div>
             </div>
-          )}
+            <div className="p-3 rounded-lg text-center" style={{ background: COLORS.surface2 }}>
+              <div className="text-xs uppercase tracking-wider mb-1" style={{ color: COLORS.textMuted }}>Messages</div>
+              <div className="text-lg font-bold" style={{ color: COLORS.text }}>{formatNumber(projectTotals.messageCount)}</div>
+            </div>
+            <div className="p-3 rounded-lg text-center" style={{ background: COLORS.surface2 }}>
+              <div className="text-xs uppercase tracking-wider mb-1" style={{ color: COLORS.textMuted }}>Total Tokens</div>
+              <div className="text-lg font-bold" style={{ color: COLORS.amber }}>{formatNumber(projectTotals.totalTokens)}</div>
+            </div>
+            <div className="p-3 rounded-lg text-center" style={{ background: COLORS.surface2 }}>
+              <div className="text-xs uppercase tracking-wider mb-1" style={{ color: COLORS.textMuted }}>Avg/Session</div>
+              <div className="text-lg font-bold" style={{ color: COLORS.coral }}>{formatNumber(Math.round(projectTotals.totalTokens / sessions.length))}</div>
+            </div>
+          </div>
 
-          {session && (
-            <>
-              {/* Session Info */}
-              <div className="flex items-center gap-4 mb-4 p-3 rounded-lg" style={{ background: COLORS.surface2 }}>
-                <span className="w-3 h-3 rounded-full" style={{ background: getModelColor(session.model) }}></span>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm" style={{ color: COLORS.text }}>{getModelDisplayName(session.model)}</span>
-                    {session.isCurrentSession && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs" style={{ background: COLORS.green + '20', color: COLORS.green }}>
-                        <span className="w-1.5 h-1.5 rounded-full pulse" style={{ background: COLORS.green }} />
-                        Live
-                      </span>
-                    )}
+          {/* Sessions List */}
+          <div className="mb-4">
+            <div className="text-xs uppercase tracking-wider mb-3" style={{ color: COLORS.textMuted }}>
+              Sessions ({sessionsWithTimeline.length} with timeline data)
+            </div>
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              {sessionsWithTimeline.map(s => {
+                const isSelected = s.sessionId === selectedSessionId;
+                const date = new Date(s.startTime);
+                const duration = formatDuration(s.startTime, s.lastActivity);
+                return (
+                  <div
+                    key={s.sessionId}
+                    onClick={() => setSelectedSessionId(s.sessionId)}
+                    className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors"
+                    style={{
+                      background: isSelected ? COLORS.coral + '20' : COLORS.surface2,
+                      border: isSelected ? `1px solid ${COLORS.coral}40` : `1px solid transparent`,
+                    }}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: getModelColor(s.model) }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium" style={{ color: COLORS.text }}>
+                          {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                        <span className="text-xs" style={{ color: COLORS.textMuted }}>
+                          {getModelDisplayName(s.model)}
+                        </span>
+                        {s.isCurrentSession && (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs" style={{ background: COLORS.green + '20', color: COLORS.green }}>
+                            <span className="w-1.5 h-1.5 rounded-full pulse" style={{ background: COLORS.green }} />
+                            Live
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs" style={{ color: COLORS.textMuted }}>
+                        {s.messageCount} msgs • {duration}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-bold" style={{ color: COLORS.amber }}>{formatNumber(s.totalTokens)}</div>
+                    </div>
                   </div>
-                  <div className="text-xs" style={{ color: COLORS.textMuted }}>
-                    {startTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • {durationMins > 60 ? `${Math.round(durationMins / 60)}h ${durationMins % 60}m` : `${durationMins}m`}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold" style={{ color: COLORS.amber }}>{formatNumber(session.totalTokens)}</div>
-                  <div className="text-xs" style={{ color: COLORS.textMuted }}>{session.messageCount} messages</div>
-                </div>
-              </div>
+                );
+              })}
+            </div>
+          </div>
 
-              {/* Stats Row */}
-              <div className="grid grid-cols-3 gap-3 mb-6">
-                <div className="p-3 rounded-lg text-center" style={{ background: COLORS.surface2 }}>
-                  <div className="text-xs uppercase tracking-wider mb-1" style={{ color: COLORS.textMuted }}>Total</div>
-                  <div className="text-lg font-bold" style={{ color: COLORS.amber }}>{formatNumber(session.totalTokens)}</div>
-                </div>
-                <div className="p-3 rounded-lg text-center" style={{ background: COLORS.surface2 }}>
-                  <div className="text-xs uppercase tracking-wider mb-1" style={{ color: COLORS.textMuted }}>Input</div>
-                  <div className="text-lg font-bold" style={{ color: COLORS.blue }}>{formatNumber(session.inputTokens)}</div>
-                </div>
-                <div className="p-3 rounded-lg text-center" style={{ background: COLORS.surface2 }}>
-                  <div className="text-xs uppercase tracking-wider mb-1" style={{ color: COLORS.textMuted }}>Output</div>
-                  <div className="text-lg font-bold" style={{ color: COLORS.purple }}>{formatNumber(session.outputTokens)}</div>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* Chart */}
+          {/* Selected Session Chart */}
           {session && timeline.length > 0 && (
-            <div className="p-4 rounded-lg mb-4" style={{ background: COLORS.surface2 }}>
+            <div className="p-4 rounded-lg" style={{ background: COLORS.surface2 }}>
               <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-medium" style={{ color: COLORS.text }}>Token Progression</h4>
-                <span className="text-xs" style={{ color: COLORS.textMuted }}>
-                  💡 Click any point for details
+                <div>
+                  <h4 className="text-sm font-medium" style={{ color: COLORS.text }}>Session Token Growth</h4>
+                  <p className="text-xs" style={{ color: COLORS.textMuted }}>
+                    {new Date(session.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • {session.messageCount} messages • {formatNumber(session.totalTokens)} tokens
+                  </p>
+                </div>
+                <span className="text-xs px-2 py-1 rounded" style={{ background: COLORS.surface3, color: COLORS.textMuted }}>
+                  Click point for details
                 </span>
               </div>
-              <Chart option={chartOption} height={280} onClick={handleChartClick} />
+              <Chart option={chartOption} height={250} onClick={handleChartClick} />
             </div>
           )}
 
@@ -1606,8 +2157,9 @@
     };
 
     // Session List
-    const SessionList = ({ sessions, onProjectClick, onSessionClick }) => {
+    const SessionList = ({ sessions, timeRangeState, onProjectClick, onSessionClick }) => {
       const [expanded, setExpanded] = useState(new Set());
+      const [sortBy, setSortBy] = useState('recent'); // 'recent' | 'tokens' | 'sessions'
 
       const toggleExpand = (id, e) => {
         e.stopPropagation();
@@ -1618,25 +2170,50 @@
       };
 
       const projectGroups = useMemo(() => {
+        // Filter sessions by date range
+        const filteredSessions = filterSessionsByDateRange(sessions, timeRangeState);
+
         const groups = new Map();
-        sessions.forEach(session => {
+        filteredSessions.forEach(session => {
           const project = session.project || 'Unknown';
           if (!groups.has(project)) groups.set(project, []);
           groups.get(project).push(session);
         });
         return Array.from(groups.entries())
+          .map(([project, sessions]) => ({
+            project,
+            sessions,
+            totalTokens: sessions.reduce((sum, s) => sum + s.totalTokens, 0),
+            sessionCount: sessions.length,
+            lastActivity: Math.max(...sessions.map(s => new Date(s.lastActivity).getTime()))
+          }))
           .sort((a, b) => {
-            const aLatest = Math.max(...a[1].map(s => new Date(s.lastActivity).getTime()));
-            const bLatest = Math.max(...b[1].map(s => new Date(s.lastActivity).getTime()));
-            return bLatest - aLatest;
+            if (sortBy === 'tokens') return b.totalTokens - a.totalTokens;
+            if (sortBy === 'sessions') return b.sessionCount - a.sessionCount;
+            return b.lastActivity - a.lastActivity; // recent
           });
-      }, [sessions]);
+      }, [sessions, timeRangeState, sortBy]);
 
       return (
-        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-          {projectGroups.slice(0, 10).map(([project, projectSessions]) => {
+        <div>
+          <ChartControls>
+            <SortButtonGroup
+              options={[
+                { value: 'recent', label: 'Most Recent' },
+                { value: 'tokens', label: 'Most Tokens' },
+                { value: 'sessions', label: 'Most Sessions' }
+              ]}
+              value={sortBy}
+              onChange={setSortBy}
+            />
+            <span className="text-xs" style={{ color: COLORS.textMuted }}>
+              {projectGroups.length} projects
+            </span>
+          </ChartControls>
+          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+          {projectGroups.slice(0, 10).map((group) => {
+            const { project, sessions: projectSessions, totalTokens } = group;
             const isExpanded = expanded.has(project);
-            const totalTokens = projectSessions.reduce((sum, s) => sum + s.totalTokens, 0);
             const latestSession = projectSessions[0];
             const projectName = project.split('/').pop() || project;
             // Get sessions with timeline data for this project
@@ -1723,20 +2300,395 @@
               </div>
             );
           })}
+          </div>
         </div>
       );
     };
 
-    // Section Header Component
-    const SectionHeader = ({ icon, title, description }) => (
-      <div className="section-header">
-        <span className="text-violet-400">{icon}</span>
-        <div>
-          <h2 className="section-title">{title}</h2>
-          {description && <p className="section-desc">{description}</p>}
+    // Section Header Component - now supports optional controls on the right
+    const SectionHeader = ({ icon, title, description, children }) => (
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-2.5">
+          <span className="text-violet-400">{icon}</span>
+          <div>
+            <h2 className="section-title">{title}</h2>
+            {description && <p className="section-desc">{description}</p>}
+          </div>
         </div>
+        {children && <div className="flex items-center gap-3 flex-wrap">{children}</div>}
       </div>
     );
+
+    // Standardized Chart Controls Components - Brutalist style
+    const ToggleButtonGroup = ({ options, value, onChange, size = 'sm' }) => {
+      const sizeClasses = size === 'sm' ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm';
+      return (
+        <div className="flex" style={{ border: `1px solid ${COLORS.border}` }}>
+          {options.map((opt, idx) => (
+            <button
+              key={opt.value}
+              onClick={() => onChange(opt.value)}
+              className={`${sizeClasses} font-medium transition-all`}
+              style={{
+                background: value === opt.value ? COLORS.surface2 : 'transparent',
+                color: value === opt.value ? COLORS.text : COLORS.textMuted,
+                borderRight: idx < options.length - 1 ? `1px solid ${COLORS.border}` : 'none'
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      );
+    };
+
+    const SortButtonGroup = ({ options, value, onChange }) => (
+      <div className="flex" style={{ border: `1px solid ${COLORS.border}` }}>
+        {options.map((opt, idx) => (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            style={{
+              background: value === opt.value ? COLORS.surface2 : 'transparent',
+              color: value === opt.value ? COLORS.text : COLORS.textMuted,
+              borderRight: idx < options.length - 1 ? `1px solid ${COLORS.border}` : 'none',
+              padding: '4px 10px',
+              fontSize: '11px',
+              fontWeight: '500',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    );
+
+    const ChartControls = ({ children }) => (
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+        {children}
+      </div>
+    );
+
+    // Accordion Component - for collapsible sections
+    const Accordion = ({ title, icon, defaultOpen = false, children }) => {
+      const [isOpen, setIsOpen] = useState(defaultOpen);
+      const contentRef = useRef(null);
+
+      return (
+        <div className="card mb-4">
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="w-full px-4 py-3 flex items-center justify-between text-left"
+            style={{ borderBottom: isOpen ? `1px solid ${COLORS.border}` : 'none' }}
+          >
+            <div className="flex items-center gap-2">
+              <span style={{ color: COLORS.textMuted }}>{icon}</span>
+              <span className="text-sm font-medium" style={{ color: COLORS.text }}>{title}</span>
+            </div>
+            <svg
+              className={`accordion-chevron ${isOpen ? 'open' : ''}`}
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={COLORS.textMuted}
+              strokeWidth="2"
+            >
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          </button>
+          <div
+            ref={contentRef}
+            className="accordion-content"
+            style={{
+              maxHeight: isOpen ? contentRef.current?.scrollHeight + 'px' : '0',
+            }}
+          >
+            <div className="p-4">
+              {children}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Project List - Compact list with progress bars
+    const ProjectList = ({ sessions, timeRangeState, onProjectClick }) => {
+      const projects = useMemo(() => {
+        const filteredSessions = filterSessionsByDateRange(sessions, timeRangeState);
+        const groups = new Map();
+        filteredSessions.forEach(session => {
+          const project = session.project || 'Unknown';
+          if (!groups.has(project)) groups.set(project, []);
+          groups.get(project).push(session);
+        });
+        const sorted = Array.from(groups.entries())
+          .map(([project, sessions]) => ({
+            project,
+            sessions,
+            totalTokens: sessions.reduce((sum, s) => sum + s.totalTokens, 0),
+          }))
+          .sort((a, b) => b.totalTokens - a.totalTokens)
+          .slice(0, 8);
+        const maxTokens = sorted[0]?.totalTokens || 1;
+        return sorted.map(p => ({ ...p, percent: (p.totalTokens / maxTokens) * 100 }));
+      }, [sessions, timeRangeState]);
+
+      if (projects.length === 0) {
+        return (
+          <div className="text-xs text-center py-4" style={{ color: COLORS.textMuted }}>
+            No projects found
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-1">
+          {projects.map(({ project, sessions, totalTokens, percent }, idx) => {
+            const projectName = project.split('/').pop() || project;
+            const displayPath = project.replace(/^\/Users\/[^/]+/, '~');
+            return (
+              <div
+                key={project}
+                onClick={() => onProjectClick?.(sessions, projectName)}
+                className="px-3 py-2 cursor-pointer rounded-md relative overflow-hidden group"
+                style={{ background: COLORS.surface2 }}
+                title={project}
+              >
+                {/* Progress bar background */}
+                <div
+                  className="absolute inset-0 opacity-20"
+                  style={{
+                    background: `linear-gradient(90deg, ${COLORS.coral} ${percent}%, transparent ${percent}%)`,
+                  }}
+                />
+                <div className="relative flex items-center justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium" style={{ color: idx < 3 ? COLORS.coral : COLORS.textMuted }}>
+                        #{idx + 1}
+                      </span>
+                      <span className="text-sm font-medium truncate" style={{ color: COLORS.text }}>
+                        {projectName}
+                      </span>
+                    </div>
+                    <div className="text-xs truncate" style={{ color: COLORS.textMuted }}>
+                      {displayPath} • {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                  <div className="text-sm font-mono font-medium" style={{ color: COLORS.coral }}>
+                    {formatNumber(totalTokens)}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    // Tabbed Sidebar - Combines Recent Sessions and Leaderboard
+    const TabbedSidebar = ({ sessions, timeRangeState, onSessionSelect, onProjectClick, onSessionClick, selectedSessionId }) => {
+      const [activeTab, setActiveTab] = useState('recent');
+
+      const filteredSessions = useMemo(() => {
+        return filterSessionsByDateRange(sessions, timeRangeState)
+          .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())
+          .slice(0, 50);
+      }, [sessions, timeRangeState]);
+
+      const leaderboardSessions = useMemo(() => {
+        return filterSessionsByDateRange(sessions, timeRangeState)
+          .sort((a, b) => b.totalTokens - a.totalTokens)
+          .slice(0, 50);
+      }, [sessions, timeRangeState]);
+
+      const renderSessionItem = (session, idx, showRank = false) => {
+        const projectName = session.project.split('/').pop() || 'Unknown';
+        const isSelected = session.sessionId === selectedSessionId;
+        return (
+          <div
+            key={session.sessionId}
+            onClick={() => onSessionClick?.(session.sessionId)}
+            className="px-3 py-2 cursor-pointer flex items-center gap-2"
+            style={{
+              background: isSelected ? COLORS.surface2 : 'transparent',
+              borderBottom: `1px solid ${COLORS.borderSubtle}`,
+            }}
+          >
+            {showRank && (
+              <div className="rank-badge" style={{
+                background: idx < 3 ? COLORS.coral + '20' : COLORS.surface2,
+                color: idx < 3 ? COLORS.coral : COLORS.textMuted
+              }}>
+                {idx + 1}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-medium truncate" style={{ color: COLORS.text }}>
+                {projectName}
+              </div>
+              <div className="text-xs truncate" style={{ color: COLORS.textMuted }}>
+                {session.messageCount} msgs • {formatRelativeTime(session.lastActivity)}
+              </div>
+            </div>
+            <div className="text-xs font-mono" style={{ color: COLORS.textSecondary }}>
+              {formatNumber(session.totalTokens)}
+            </div>
+          </div>
+        );
+      };
+
+      return (
+        <div className="card h-full flex flex-col">
+          {/* Tab Header */}
+          <div className="flex" style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+            <button
+              onClick={() => setActiveTab('recent')}
+              className={`sidebar-tab ${activeTab === 'recent' ? 'active' : ''}`}
+            >
+              RECENT
+            </button>
+            <button
+              onClick={() => setActiveTab('leaderboard')}
+              className={`sidebar-tab ${activeTab === 'leaderboard' ? 'active' : ''}`}
+            >
+              TOP USAGE
+            </button>
+          </div>
+          {/* Tab Content */}
+          <div className="flex-1 overflow-y-auto">
+            {activeTab === 'recent' ? (
+              filteredSessions.map((s, i) => renderSessionItem(s, i, false))
+            ) : (
+              leaderboardSessions.map((s, i) => renderSessionItem(s, i, true))
+            )}
+            {(activeTab === 'recent' ? filteredSessions : leaderboardSessions).length === 0 && (
+              <div className="p-4 text-center text-xs" style={{ color: COLORS.textMuted }}>
+                No sessions found
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // Compact KPI Strip for top bar
+    const KPIStrip = ({ stats, tokenRate }) => (
+      <div className="flex items-center gap-6 py-3 px-4" style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+        <div className="flex items-center gap-2">
+          <span className="text-xs" style={{ color: COLORS.textMuted }}>TOTAL</span>
+          <span className="text-sm font-bold" style={{ color: COLORS.text }}>{formatNumber(stats.totalTokens)}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs" style={{ color: COLORS.textMuted }}>IN</span>
+          <span className="text-sm font-medium" style={{ color: COLORS.blue }}>{formatNumber(stats.inputTokens)}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs" style={{ color: COLORS.textMuted }}>OUT</span>
+          <span className="text-sm font-medium" style={{ color: COLORS.purple }}>{formatNumber(stats.outputTokens)}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs" style={{ color: COLORS.textMuted }}>CACHE</span>
+          <span className="text-sm font-medium" style={{ color: COLORS.green }}>{stats.cacheEfficiency.toFixed(0)}%</span>
+        </div>
+        {tokenRate > 0 && (
+          <div className="flex items-center gap-2" title="Average tokens per message in this period">
+            <span className="text-xs" style={{ color: COLORS.textMuted }}>TOKENS/MSG</span>
+            <span className="text-sm font-medium" style={{ color: COLORS.coral }}>~{formatNumber(tokenRate)}</span>
+          </div>
+        )}
+      </div>
+    );
+
+    // Activity Insights Component - Shows written insights about usage patterns
+    const ActivityInsights = ({ sessions, dailyActivity }) => {
+      const insights = useMemo(() => {
+        if (!sessions.length) return null;
+
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+        // Calculate activity by day and hour
+        const hourCounts = new Array(24).fill(0);
+        const dayCounts = new Array(7).fill(0);
+        const dayHourCounts = {};
+
+        sessions.forEach(session => {
+          const date = new Date(session.startTime);
+          const hour = date.getHours();
+          const day = date.getDay();
+          const key = `${day}-${hour}`;
+
+          hourCounts[hour] += session.messageCount;
+          dayCounts[day] += session.messageCount;
+          dayHourCounts[key] = (dayHourCounts[key] || 0) + session.messageCount;
+        });
+
+        // Find most active day
+        const maxDayIdx = dayCounts.indexOf(Math.max(...dayCounts));
+        const mostActiveDay = days[maxDayIdx];
+
+        // Find most active hour range
+        let maxHourSum = 0;
+        let maxHourStart = 0;
+        for (let i = 0; i < 22; i++) {
+          const sum = hourCounts[i] + hourCounts[i + 1] + hourCounts[i + 2];
+          if (sum > maxHourSum) {
+            maxHourSum = sum;
+            maxHourStart = i;
+          }
+        }
+        const formatHour = (h) => h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h - 12}pm`;
+        const peakHourRange = `${formatHour(maxHourStart)} - ${formatHour(maxHourStart + 3)}`;
+
+        // Calculate averages
+        const uniqueDays = new Set(dailyActivity.map(d => d.date)).size || 1;
+        const avgMessagesPerDay = Math.round(sessions.reduce((sum, s) => sum + s.messageCount, 0) / uniqueDays);
+        const avgSessionsPerDay = Math.round(sessions.length / uniqueDays * 10) / 10;
+        const avgTokensPerSession = Math.round(sessions.reduce((sum, s) => sum + s.totalTokens, 0) / sessions.length);
+
+        return {
+          mostActiveDay,
+          peakHourRange,
+          avgMessagesPerDay,
+          avgSessionsPerDay,
+          avgTokensPerSession,
+          totalSessions: sessions.length
+        };
+      }, [sessions, dailyActivity]);
+
+      if (!insights) return null;
+
+      return (
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span style={{ color: COLORS.coral }}>{Icons.lightbulb}</span>
+            <span className="text-sm font-medium" style={{ color: COLORS.text }}>Activity Insights</span>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm" style={{ color: COLORS.textSecondary }}>
+              You're most active on <span style={{ color: COLORS.coral, fontWeight: 500 }}>{insights.mostActiveDay}s</span> between{' '}
+              <span style={{ color: COLORS.coral, fontWeight: 500 }}>{insights.peakHourRange}</span>.
+            </p>
+            <div className="flex flex-wrap gap-4 mt-3 pt-3" style={{ borderTop: `1px solid ${COLORS.surface3}` }}>
+              <div>
+                <span className="text-xs block" style={{ color: COLORS.textMuted }}>Avg messages/day</span>
+                <span className="text-sm font-medium" style={{ color: COLORS.text }}>{insights.avgMessagesPerDay}</span>
+              </div>
+              <div>
+                <span className="text-xs block" style={{ color: COLORS.textMuted }}>Avg sessions/day</span>
+                <span className="text-sm font-medium" style={{ color: COLORS.text }}>{insights.avgSessionsPerDay}</span>
+              </div>
+              <div>
+                <span className="text-xs block" style={{ color: COLORS.textMuted }}>Avg tokens/session</span>
+                <span className="text-sm font-medium" style={{ color: COLORS.text }}>{formatNumber(insights.avgTokensPerSession)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
 
     // Message Section Detail Component
     const MessageSectionDetail = ({ session, selectedIndex, timeline, onClose }) => {
@@ -1987,21 +2939,25 @@
     };
 
     // Session Growth Chart - Shows token evolution within a session
-    const SessionGrowth = ({ sessions }) => {
+    const SessionGrowth = ({ sessions, timeRangeState, selectedSessionId: externalSelectedId }) => {
       const sessionsWithTimeline = useMemo(() => {
-        return sessions.filter(s => s.tokenTimeline && s.tokenTimeline.length > 1);
-      }, [sessions]);
+        // Filter sessions by date range first
+        const filteredSessions = filterSessionsByDateRange(sessions, timeRangeState);
+        return filteredSessions.filter(s => s.tokenTimeline && s.tokenTimeline.length > 1);
+      }, [sessions, timeRangeState]);
 
       const [selectedSessionId, setSelectedSessionId] = useState(null);
       const [selectedMessageIndex, setSelectedMessageIndex] = useState(null);
 
-      // Auto-select current session or first available
+      // Auto-select from external ID or current session or first available
       useEffect(() => {
-        if (!selectedSessionId && sessionsWithTimeline.length > 0) {
+        if (externalSelectedId) {
+          setSelectedSessionId(externalSelectedId);
+        } else if (!selectedSessionId && sessionsWithTimeline.length > 0) {
           const current = sessionsWithTimeline.find(s => s.isCurrentSession);
           setSelectedSessionId(current?.sessionId || sessionsWithTimeline[0].sessionId);
         }
-      }, [sessionsWithTimeline, selectedSessionId]);
+      }, [sessionsWithTimeline, selectedSessionId, externalSelectedId]);
 
       const selectedSession = useMemo(() => {
         return sessionsWithTimeline.find(s => s.sessionId === selectedSessionId);
@@ -2101,9 +3057,13 @@
             itemWidth: 12,
             itemHeight: 8
           },
-          grid: { left: 50, right: 15, top: 15, bottom: 40 },
+          grid: { left: 60, right: 15, top: 20, bottom: 50 },
           xAxis: {
             type: 'category',
+            name: 'MESSAGE #',
+            nameLocation: 'middle',
+            nameGap: 30,
+            nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace' },
             data: timeLabels,
             axisLine: { lineStyle: { color: COLORS.borderSubtle } },
             axisLabel: {
@@ -2116,6 +3076,10 @@
           },
           yAxis: {
             type: 'value',
+            name: 'TOKENS',
+            nameLocation: 'middle',
+            nameGap: 45,
+            nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace' },
             axisLine: { show: false },
             splitLine: { lineStyle: { color: COLORS.borderSubtle } },
             axisLabel: { color: COLORS.textMuted, fontSize: 10, formatter: (v) => formatNumber(v) }
@@ -2221,9 +3185,9 @@
             )}
           </div>
           <div className="text-xs mb-2" style={{ color: COLORS.textMuted }}>
-            💡 Click on any point to see detailed breakdown
+            Click on any point to see detailed breakdown
           </div>
-          <Chart option={option} height={260} onClick={handleChartClick} />
+          <Chart option={option} height={340} onClick={handleChartClick} />
 
           {/* Modal for message detail */}
           <Modal isOpen={selectedMessageIndex !== null} onClose={() => setSelectedMessageIndex(null)}>
@@ -2236,6 +3200,257 @@
               />
             )}
           </Modal>
+        </div>
+      );
+    };
+
+    // Session Leaderboard - Rankings of sessions by various metrics
+    const SessionLeaderboard = ({ sessions, timeRangeState, onSessionSelect, selectedSessionId }) => {
+      const [sortBy, setSortBy] = useState('tokens'); // 'recent' | 'tokens' | 'messages'
+      const [viewMode, setViewMode] = useState('chart'); // 'list' | 'chart'
+      const [chartType, setChartType] = useState('bar'); // 'bar' | 'line'
+
+      const sortedSessions = useMemo(() => {
+        const filtered = filterSessionsByDateRange(sessions, timeRangeState);
+
+        const sorted = [...filtered].sort((a, b) => {
+          if (sortBy === 'recent') {
+            return new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime();
+          } else if (sortBy === 'tokens') {
+            return b.totalTokens - a.totalTokens;
+          } else { // messages
+            return b.messageCount - a.messageCount;
+          }
+        });
+
+        return sorted.slice(0, 10); // Top 10
+      }, [sessions, timeRangeState, sortBy]);
+
+      const chartOption = useMemo(() => {
+        // Sessions are already sorted by sortBy
+        const chartSessions = [...sortedSessions];
+
+        return {
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' },
+            backgroundColor: COLORS.surface1,
+            borderColor: COLORS.border,
+            textStyle: { color: COLORS.text },
+            extraCssText: 'border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);',
+            formatter: (params) => {
+              if (!params.length) return '';
+              const sessionName = params[0].name;
+              const sessionData = chartSessions.find(s => {
+                const name = s.project.split('/').pop() || 'Unknown';
+                const displayName = name.length > 12 ? name.slice(0, 10) + '...' : name;
+                return displayName === sessionName;
+              });
+              const inputTokens = params.find(p => p.seriesName === 'Input')?.value || 0;
+              const outputTokens = params.find(p => p.seriesName === 'Output')?.value || 0;
+              const totalTokens = inputTokens + outputTokens;
+
+              let tooltip = `<div style="font-weight:600;margin-bottom:4px;color:#FAFAFA">${sessionName}</div>
+                <div style="color:#60A5FA">Input: ${formatNumber(inputTokens)}</div>
+                <div style="color:#A78BFA">Output: ${formatNumber(outputTokens)}</div>
+                <div style="color:#FAFAFA;margin-top:4px;border-top:1px solid #3F3F46;padding-top:4px">Total: ${formatNumber(totalTokens)}</div>`;
+
+              if (sessionData) {
+                const createdDate = new Date(sessionData.startTime).toLocaleDateString();
+                const createdTime = new Date(sessionData.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const lastDate = new Date(sessionData.lastActivity).toLocaleDateString();
+                const lastTime = new Date(sessionData.lastActivity).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const duration = formatDuration(sessionData.startTime, sessionData.lastActivity);
+                tooltip += `<div style="color:#71717A;font-size:11px;margin-top:6px;border-top:1px solid #3F3F46;padding-top:6px;line-height:1.6">
+                  <div style="color:#71717A">Duration: <span style="color:#D97706;font-weight:500">${duration}</span></div>
+                  <div style="color:#71717A">Started: <span style="color:#A1A1AA">${createdDate} ${createdTime}</span></div>
+                  <div style="color:#71717A">Last msg: <span style="color:#A1A1AA">${lastDate} ${lastTime}</span></div>
+                </div>`;
+              }
+
+              return tooltip;
+            }
+          },
+          legend: {
+            data: ['Input', 'Output'],
+            textStyle: { color: COLORS.textSecondary, fontSize: 10 },
+            bottom: 0
+          },
+          grid: { left: '10%', right: '10%', top: 20, bottom: 50, containLabel: true },
+          xAxis: {
+            type: 'category',
+            name: 'SESSION',
+            nameLocation: 'middle',
+            nameGap: 30,
+            nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: 'Inter, system-ui, sans-serif' },
+            data: chartSessions.map(s => {
+              const name = s.project.split('/').pop() || 'Unknown';
+              return name.length > 12 ? name.slice(0, 10) + '...' : name;
+            }),
+            axisLine: { show: false },
+            axisTick: { show: false },
+            axisLabel: { color: COLORS.textSecondary, fontSize: 10 }
+          },
+          yAxis: {
+            type: 'value',
+            name: 'TOKENS',
+            nameLocation: 'middle',
+            nameGap: 50,
+            nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: 'Inter, system-ui, sans-serif' },
+            axisLine: { show: false },
+            splitLine: { lineStyle: { color: COLORS.surface3 } },
+            axisLabel: { color: COLORS.textSecondary, fontSize: 10, formatter: (v) => formatNumber(v) }
+          },
+          series: [
+            {
+              name: 'Input',
+              type: chartType,
+              stack: 'total',
+              data: chartSessions.map(s => s.inputTokens),
+              itemStyle: { color: COLORS.blue, borderRadius: chartType === 'bar' ? [0, 0, 0, 0] : undefined },
+              smooth: chartType === 'line' ? true : false,
+              label: { show: false }
+            },
+            {
+              name: 'Output',
+              type: chartType,
+              stack: 'total',
+              data: chartSessions.map(s => s.outputTokens),
+              itemStyle: { color: COLORS.purple, borderRadius: chartType === 'bar' ? [4, 4, 0, 0] : undefined },
+              smooth: chartType === 'line' ? true : false,
+              label: { show: false }
+            }
+          ]
+        };
+      }, [sortedSessions, chartType]);
+
+      if (sortedSessions.length === 0) {
+        return <div style={{ color: COLORS.textMuted, textAlign: 'center', padding: '20px' }}>No sessions found</div>;
+      }
+
+      return (
+        <div>
+          {/* Controls row */}
+          <ChartControls>
+            <div className="flex items-center gap-3">
+              <ToggleButtonGroup
+                options={[
+                  { value: 'list', label: 'List' },
+                  { value: 'chart', label: 'Chart' }
+                ]}
+                value={viewMode}
+                onChange={setViewMode}
+              />
+              {viewMode === 'chart' && (
+                <ToggleButtonGroup
+                  options={[
+                    { value: 'bar', label: 'Bar' },
+                    { value: 'line', label: 'Line' }
+                  ]}
+                  value={chartType}
+                  onChange={setChartType}
+                />
+              )}
+            </div>
+            <SortButtonGroup
+              options={[
+                { value: 'tokens', label: 'Most Tokens' },
+                { value: 'recent', label: 'Most Recent' },
+                { value: 'messages', label: 'Most Messages' }
+              ]}
+              value={sortBy}
+              onChange={setSortBy}
+            />
+          </ChartControls>
+
+          {/* Chart view */}
+          {viewMode === 'chart' && (
+            <div>
+              <Chart option={chartOption} height={400} />
+            </div>
+          )}
+
+          {/* Leaderboard list view */}
+          {viewMode === 'list' && (
+          <div className="space-y-2">
+            {sortedSessions.map((session, idx) => {
+              const projectName = session.project.split('/').pop() || 'Unknown';
+              const modelColor = getModelColor(session.model);
+              const isSelected = session.sessionId === selectedSessionId;
+
+              return (
+                <div
+                  key={session.sessionId}
+                  onClick={() => onSessionSelect(session.sessionId)}
+                  className={`session-item cursor-pointer p-3 rounded-lg border transition-all ${
+                    isSelected ? 'border-coral' : 'border-borderSubtle'
+                  }`}
+                  style={{
+                    borderColor: isSelected ? COLORS.coral : COLORS.border,
+                    background: isSelected
+                      ? `linear-gradient(135deg, ${COLORS.coral}15, ${COLORS.surface1})`
+                      : COLORS.surface1
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Rank badge */}
+                    <div
+                      className="rank-badge"
+                      style={{
+                        background: idx < 3
+                          ? `linear-gradient(135deg, ${COLORS.coral}20, ${COLORS.coral}10)`
+                          : COLORS.surface2,
+                        color: idx < 3 ? COLORS.coral : COLORS.textMuted,
+                        border: idx < 3 ? `1px solid ${COLORS.coral}30` : `1px solid ${COLORS.border}`
+                      }}
+                    >
+                      {idx + 1}
+                    </div>
+
+                    {/* Project info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-2 h-2 rounded-full" style={{ background: modelColor }} />
+                        <span className="font-medium text-sm truncate">{projectName}</span>
+                        {session.isCurrentSession && (
+                          <span className="text-xs px-1.5 py-0.5 rounded" style={{
+                            background: COLORS.coral + '20',
+                            color: COLORS.coral
+                          }}>LIVE</span>
+                        )}
+                      </div>
+
+                      {/* Full project path (small) */}
+                      <div className="text-xs mb-1 truncate" style={{ color: COLORS.textMuted, opacity: 0.6 }} title={session.project}>
+                        {session.project}
+                      </div>
+
+                      {/* Stats */}
+                      <div className="flex items-center gap-4 text-xs flex-wrap" style={{ color: COLORS.textMuted }}>
+                        <span title={`${formatNumber(session.inputTokens)} input + ${formatNumber(session.outputTokens)} output`} style={{ cursor: 'help' }}>
+                          {formatNumber(session.totalTokens)} tokens
+                        </span>
+                        <span>{session.messageCount} msgs</span>
+                        <span>{formatRelativeTime(session.lastActivity)}</span>
+                      </div>
+                    </div>
+
+                    {/* Cost */}
+                    <div className="text-right flex-shrink-0">
+                      <div
+                        className="text-sm font-medium"
+                        style={{ color: COLORS.text, cursor: 'help' }}
+                        title="Estimated cost based on Claude API pricing. If you're on a subscription plan, your actual cost may vary."
+                      >
+                        ${session.costUSD.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          )}
         </div>
       );
     };
@@ -2594,7 +3809,55 @@
     };
 
     // Price Estimator Tab
-    const PriceEstimator = ({ stats }) => {
+    const PriceEstimator = ({ sessions, timeRangeState, dailyActivity }) => {
+      // Calculate model usage from filtered sessions
+      const filteredModelUsage = useMemo(() => {
+        const filteredSessions = filterSessionsByDateRange(sessions, timeRangeState);
+        const usage = {};
+        filteredSessions.forEach(session => {
+          const model = session.model || 'unknown';
+          if (!usage[model]) {
+            usage[model] = {
+              inputTokens: 0,
+              outputTokens: 0,
+              cacheReadInputTokens: 0,
+              cacheCreationInputTokens: 0,
+            };
+          }
+          usage[model].inputTokens += session.inputTokens || 0;
+          usage[model].outputTokens += session.outputTokens || 0;
+          usage[model].cacheReadInputTokens += session.cacheTokens || 0;
+          usage[model].cacheCreationInputTokens += session.cacheWriteTokens || 0;
+        });
+        return usage;
+      }, [sessions, timeRangeState]);
+
+      // Filter daily activity by date range
+      const filteredDailyActivity = useMemo(() => {
+        return filterDailyDataByRange(dailyActivity, timeRangeState);
+      }, [dailyActivity, timeRangeState]);
+
+      // Compute aggregated stats from filtered sessions
+      const filteredStats = useMemo(() => {
+        const filteredSessions = filterSessionsByDateRange(sessions, timeRangeState);
+        const totalTokens = filteredSessions.reduce((sum, s) => sum + (s.totalTokens || 0), 0);
+        const freshInputTokens = filteredSessions.reduce((sum, s) => sum + (s.inputTokens || 0), 0);
+        const cacheReadTokens = filteredSessions.reduce((sum, s) => sum + (s.cacheTokens || 0), 0);
+        const totalMessages = filteredSessions.reduce((sum, s) => sum + (s.messageCount || 0), 0);
+        // Total input = fresh input + cache reads (what would have been input without cache)
+        const totalInputTokens = freshInputTokens + cacheReadTokens;
+        // Cache efficiency = what % of input processing was served from cache
+        const cacheEfficiency = totalInputTokens > 0 ? (cacheReadTokens / totalInputTokens) * 100 : 0;
+        return {
+          totalTokens,
+          totalSessions: filteredSessions.length,
+          totalMessages,
+          cacheReadTokens,
+          totalInputTokens,
+          cacheEfficiency,
+        };
+      }, [sessions, timeRangeState]);
+
       const costBreakdown = useMemo(() => {
         const breakdown = [];
         let totalCost = 0;
@@ -2603,7 +3866,7 @@
         let totalCacheReadCost = 0;
         let totalCacheWriteCost = 0;
 
-        for (const [modelId, usage] of Object.entries(stats.modelUsage)) {
+        for (const [modelId, usage] of Object.entries(filteredModelUsage)) {
           const pricing = PRICING_DATA[modelId] || PRICING_DATA['claude-sonnet-4-5-20250929'];
           const inputCost = (usage.inputTokens / 1_000_000) * pricing.input;
           const outputCost = (usage.outputTokens / 1_000_000) * pricing.output;
@@ -2650,11 +3913,11 @@
           totalCacheWriteCost,
           totalSavings
         };
-      }, [stats.modelUsage]);
+      }, [filteredModelUsage]);
 
       // Calculate projections based on daily average
       const projections = useMemo(() => {
-        const days = stats.dailyActivity?.length || 1;
+        const days = filteredDailyActivity?.length || 1;
         const dailyAvg = costBreakdown.totalCost / Math.max(days, 1);
         return {
           daily: dailyAvg,
@@ -2662,7 +3925,7 @@
           monthly: dailyAvg * 30,
           yearly: dailyAvg * 365
         };
-      }, [costBreakdown.totalCost, stats.dailyActivity]);
+      }, [costBreakdown.totalCost, filteredDailyActivity]);
 
       // Pie chart for model distribution
       const modelChartOption = useMemo(() => {
@@ -2736,8 +3999,30 @@
         };
       }, [costBreakdown]);
 
+      // Get time range label
+      const getTimeRangeLabel = () => {
+        if (timeRangeState.preset === 'custom' && timeRangeState.customRange) {
+          const start = new Date(timeRangeState.customRange.startDate).toLocaleDateString();
+          const end = new Date(timeRangeState.customRange.endDate).toLocaleDateString();
+          return `${start} - ${end}`;
+        }
+        const labels = { '1W': 'Last 7 Days', '1M': 'Last 30 Days', 'YTD': 'Year to Date', 'All': 'All Time' };
+        return labels[timeRangeState.preset] || 'All Time';
+      };
+
       return (
-        <div className="space-y-6">
+        <div className="p-6 space-y-6 max-w-6xl mx-auto">
+          {/* Time Range Indicator */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span style={{ color: COLORS.coral }}>{Icons.dollar}</span>
+              <span className="text-lg font-semibold" style={{ color: COLORS.text }}>Cost Estimate</span>
+            </div>
+            <span className="text-sm px-3 py-1 rounded-full" style={{ background: COLORS.surface2, color: COLORS.textSecondary }}>
+              {getTimeRangeLabel()}
+            </span>
+          </div>
+
           {/* Disclaimer Banner */}
           <div className="card p-4 border-l-4" style={{ borderLeftColor: COLORS.amber, background: `linear-gradient(90deg, ${COLORS.amber}08, ${COLORS.surface1})` }}>
             <div className="flex items-start gap-3">
@@ -2767,17 +4052,17 @@
               <div className="flex items-center gap-4 pt-4 border-t" style={{ borderColor: COLORS.borderSubtle }}>
                 <div>
                   <p className="text-xs" style={{ color: COLORS.textMuted }}>Tokens Used</p>
-                  <p className="font-semibold" style={{ color: COLORS.text }}>{formatNumber(stats.totalTokens)}</p>
+                  <p className="font-semibold" style={{ color: COLORS.text }}>{formatNumber(filteredStats.totalTokens)}</p>
                 </div>
                 <div className="w-px h-8" style={{ background: COLORS.borderSubtle }}></div>
                 <div>
                   <p className="text-xs" style={{ color: COLORS.textMuted }}>Sessions</p>
-                  <p className="font-semibold" style={{ color: COLORS.text }}>{stats.totalSessions}</p>
+                  <p className="font-semibold" style={{ color: COLORS.text }}>{filteredStats.totalSessions}</p>
                 </div>
                 <div className="w-px h-8" style={{ background: COLORS.borderSubtle }}></div>
                 <div>
                   <p className="text-xs" style={{ color: COLORS.textMuted }}>Messages</p>
-                  <p className="font-semibold" style={{ color: COLORS.text }}>{formatNumber(stats.totalMessages)}</p>
+                  <p className="font-semibold" style={{ color: COLORS.text }}>{formatNumber(filteredStats.totalMessages)}</p>
                 </div>
               </div>
             </div>
@@ -2795,20 +4080,20 @@
               </div>
               <div className="pt-4 border-t" style={{ borderColor: COLORS.borderSubtle }}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs" style={{ color: COLORS.textMuted }}>Cache Efficiency</span>
-                  <span className="text-sm font-semibold" style={{ color: COLORS.green }}>{stats.cacheEfficiency.toFixed(1)}%</span>
+                  <span className="text-xs" style={{ color: COLORS.textMuted }}>Cache Hit Rate</span>
+                  <span className="text-sm font-semibold" style={{ color: COLORS.green }}>{filteredStats.cacheEfficiency.toFixed(1)}%</span>
                 </div>
                 <div className="h-2 rounded-full overflow-hidden" style={{ background: COLORS.surface3 }}>
                   <div
                     className="h-full rounded-full transition-all"
                     style={{
-                      width: `${Math.min(stats.cacheEfficiency, 100)}%`,
+                      width: `${Math.min(filteredStats.cacheEfficiency, 100)}%`,
                       background: `linear-gradient(90deg, ${COLORS.green}, ${COLORS.blue})`
                     }}
                   />
                 </div>
                 <p className="text-xs mt-2" style={{ color: COLORS.textMuted }}>
-                  {formatNumber(stats.cacheReadTokens)} tokens served from cache
+                  {formatNumber(filteredStats.cacheReadTokens)} of {formatNumber(filteredStats.totalInputTokens)} input tokens served from cache
                 </p>
               </div>
             </div>
@@ -3026,13 +4311,139 @@
       );
     };
 
+    // Date Picker Modal Component
+    const DatePickerModal = ({ onClose, onApply, initialRange }) => {
+      const [startDate, setStartDate] = useState(initialRange?.startDate || '');
+      const [endDate, setEndDate] = useState(initialRange?.endDate || '');
+      const [error, setError] = useState('');
+
+      const handleApply = () => {
+        if (!startDate || !endDate) {
+          setError('Please select both start and end dates');
+          return;
+        }
+
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+
+        if (start > end) {
+          setError('Start date must be before end date');
+          return;
+        }
+
+        if (end > new Date()) {
+          setError('End date cannot be in the future');
+          return;
+        }
+
+        onApply({ startDate, endDate });
+      };
+
+      return (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={onClose}
+        >
+          <div
+            className="card p-6 w-full max-w-md space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold" style={{ color: COLORS.text }}>
+                Custom Date Range
+              </h3>
+              <button
+                onClick={onClose}
+                className="text-xl"
+                style={{ color: COLORS.textMuted }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: COLORS.textSecondary }}>
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={e => { setStartDate(e.target.value); setError(''); }}
+                  className="w-full px-3 py-2 rounded-lg border"
+                  style={{
+                    background: COLORS.surface2,
+                    borderColor: COLORS.border,
+                    color: COLORS.text
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: COLORS.textSecondary }}>
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={e => { setEndDate(e.target.value); setError(''); }}
+                  className="w-full px-3 py-2 rounded-lg border"
+                  style={{
+                    background: COLORS.surface2,
+                    borderColor: COLORS.border,
+                    color: COLORS.text
+                  }}
+                />
+              </div>
+
+              {error && (
+                <div className="text-sm px-3 py-2 rounded-lg" style={{
+                  background: 'rgba(232, 138, 138, 0.1)',
+                  color: '#E88A8A',
+                  border: '1px solid rgba(232, 138, 138, 0.2)'
+                }}>
+                  {error}
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={onClose}
+                  className="flex-1 px-4 py-2 rounded-lg font-medium transition-colors"
+                  style={{
+                    background: COLORS.surface2,
+                    color: COLORS.textSecondary
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleApply}
+                  className="flex-1 px-4 py-2 rounded-lg font-medium transition-colors"
+                  style={{
+                    background: COLORS.coral,
+                    color: 'white'
+                  }}
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
     // Main App
     const App = () => {
-      const { stats, connected } = useTokenData();
+      const { stats, connected, isInitialLoad } = useTokenData();
       const [activeTab, setActiveTab] = useState('dashboard');
-      const [timeRange, setTimeRange] = useState('weekly');
-      const [viewMode, setViewMode] = useState('models');
-      const [raceViewMode, setRaceViewMode] = useState('race');
+      const [timeRangeState, setTimeRangeState] = useState({
+        preset: '1M',
+        customRange: null
+      });
+      const [showDatePicker, setShowDatePicker] = useState(false);
+      const [viewMode, setViewMode] = useState('activity'); // Default to activity/messages view
       const [selectedProject, setSelectedProject] = useState(null); // { sessions: [], projectName: '' }
       const [selectedSessionId, setSelectedSessionId] = useState(null); // For session detail page
 
@@ -3042,33 +4453,26 @@
 
       // Calculate filtered stats based on time range
       const filteredStats = useMemo(() => {
-        const now = new Date();
-        let cutoffDate = null;
-
-        if (timeRange === 'daily') {
-          cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        } else if (timeRange === 'weekly') {
-          cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        }
-
-        if (!cutoffDate) {
-          // All time
-          return {
-            sessions: stats.totalSessions,
-            messages: stats.totalMessages
-          };
-        }
-
-        // Filter sessions by the cutoff date
-        const filteredSessions = stats.sessions.filter(s =>
-          s.lastActivity && new Date(s.lastActivity) >= cutoffDate
-        );
+        const filteredSessions = filterSessionsByDateRange(stats.sessions, timeRangeState);
 
         return {
           sessions: filteredSessions.length,
           messages: filteredSessions.reduce((sum, s) => sum + s.messageCount, 0)
         };
-      }, [stats.sessions, stats.totalSessions, stats.totalMessages, timeRange]);
+      }, [stats.sessions, timeRangeState]);
+
+      // Calculate token rate from active sessions
+      const tokenRate = useMemo(() => {
+        const activeSessions = stats.sessions.filter(s => s.isCurrentSession);
+        if (activeSessions.length === 0) return 0;
+
+        // Calculate average tokens per message from active sessions
+        const totalTokens = activeSessions.reduce((sum, s) => sum + s.totalTokens, 0);
+        const totalMessages = activeSessions.reduce((sum, s) => sum + s.messageCount, 0);
+
+        if (totalMessages === 0) return 0;
+        return Math.ceil(totalTokens / totalMessages);
+      }, [stats.sessions]);
 
       const handleProjectClick = useCallback((sessions, projectName) => {
         setSelectedProject({ sessions, projectName });
@@ -3077,6 +4481,11 @@
       const handleSessionDetailClick = useCallback((sessionId) => {
         setSelectedSessionId(sessionId);
       }, []);
+
+      // Show loading screen during initial load (after all hooks)
+      if (isInitialLoad) {
+        return <LoadingScreen />;
+      }
 
       // If viewing session detail, show the detail page
       if (selectedSessionId) {
@@ -3091,177 +4500,196 @@
       }
 
       return (
-        <div className="min-h-screen p-4 md:p-6 max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-8">
+        <div className="min-h-screen" style={{ background: COLORS.surface0 }}>
+          {/* Header - Sticky */}
+          <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-50 backdrop-blur-sm" style={{ borderBottom: `1px solid ${COLORS.border}`, background: COLORS.surface1 + 'F5' }}>
             <div className="flex items-center gap-6">
-              <div>
-                <h1 className="text-lg font-semibold" style={{ color: COLORS.text }}>Token Monitor</h1>
-                <p className="text-xs" style={{ color: COLORS.textMuted }}>Claude Code analytics</p>
-              </div>
+              {/* Logo */}
+              <h1 className="text-sm font-semibold" style={{ color: COLORS.text }}>
+                Claude Token Monitor
+              </h1>
               {/* Tab Navigation */}
-              <div className="flex items-center gap-1 p-1 rounded-lg" style={{ background: COLORS.surface2 }}>
+              <div className="flex items-center">
                 <button
                   onClick={() => setActiveTab('dashboard')}
-                  className={`nav-tab ${activeTab === 'dashboard' ? 'nav-tab-active' : 'nav-tab-inactive'}`}
+                  className="nav-tab"
+                  style={{
+                    color: activeTab === 'dashboard' ? COLORS.text : COLORS.textMuted,
+                    borderBottomColor: activeTab === 'dashboard' ? COLORS.coral : 'transparent'
+                  }}
                 >
                   Dashboard
                 </button>
                 <button
                   onClick={() => setActiveTab('pricing')}
-                  className={`nav-tab ${activeTab === 'pricing' ? 'nav-tab-active' : 'nav-tab-inactive'}`}
+                  className="nav-tab"
+                  style={{
+                    color: activeTab === 'pricing' ? COLORS.text : COLORS.textMuted,
+                    borderBottomColor: activeTab === 'pricing' ? COLORS.coral : 'transparent'
+                  }}
                 >
-                  Price Estimator
+                  Pricing
                 </button>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs" style={{ color: COLORS.textMuted }}>{lastUpdated}</span>
-              <span className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-full font-medium ${
-                connected
-                  ? ''
-                  : ''
-              }`} style={{
-                background: connected ? 'rgba(91, 189, 114, 0.1)' : 'rgba(232, 138, 138, 0.1)',
-                color: connected ? COLORS.green : '#E88A8A',
-                border: `1px solid ${connected ? 'rgba(91, 189, 114, 0.2)' : 'rgba(232, 138, 138, 0.2)'}`
-              }}>
-                <span className={`w-1.5 h-1.5 rounded-full ${connected ? '' : 'pulse'}`}
+            <div className="flex items-center gap-4">
+              {/* Live Connection Status - Minimal */}
+              <span className="flex items-center gap-2 text-xs" style={{ color: connected ? COLORS.green : '#E88A8A' }}>
+                <span className={`w-1.5 h-1.5 ${connected ? '' : 'pulse'}`}
                   style={{ background: connected ? COLORS.green : '#E88A8A' }} />
-                {connected ? 'Live' : 'Reconnecting'}
+                {connected ? 'LIVE' : 'RECONNECTING'}
               </span>
+
+              {/* Time Range Filters - Minimal */}
+              <div className="flex gap-0" style={{ border: `1px solid ${COLORS.border}` }}>
+                {[
+                  { preset: '1W', label: '1W' },
+                  { preset: '1M', label: '1M' },
+                  { preset: 'YTD', label: 'YTD' },
+                  { preset: 'All', label: 'ALL' }
+                ].map(({ preset, label }, idx) => (
+                  <button
+                    key={preset}
+                    onClick={() => setTimeRangeState({ preset, customRange: null })}
+                    style={{
+                      background: timeRangeState.preset === preset ? COLORS.surface2 : 'transparent',
+                      color: timeRangeState.preset === preset ? COLORS.text : COLORS.textMuted,
+                      borderRight: idx < 3 ? `1px solid ${COLORS.border}` : 'none',
+                      padding: '4px 10px',
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
           {activeTab === 'pricing' ? (
-            <PriceEstimator stats={stats} />
+            <PriceEstimator
+              sessions={stats.sessions}
+              timeRangeState={timeRangeState}
+              dailyActivity={stats.dailyActivity}
+            />
           ) : (
             <>
-              {/* Stats Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <StatCard
-                  title="Total Tokens"
-                  value={formatNumber(stats.totalTokens)}
-                  subtitle="All time usage"
-                  icon={Icons.activity}
-                  accent
-                />
-                <StatCard
-                  title="Input"
-                  value={formatNumber(stats.inputTokens)}
-                  subtitle="Sent to Claude"
-                  icon={Icons.arrowUp}
-                />
-                <StatCard
-                  title="Output"
-                  value={formatNumber(stats.outputTokens)}
-                  subtitle="Generated responses"
-                  icon={Icons.arrowDown}
-                />
-                <StatCard
-                  title="Cache Hit"
-                  value={`${stats.cacheEfficiency.toFixed(0)}%`}
-                  subtitle={`${formatNumber(stats.cacheReadTokens)} saved`}
-                  icon={Icons.zap}
-                />
+              {/* KPI Strip - Compact stats bar */}
+              <KPIStrip stats={stats} tokenRate={tokenRate} />
+
+              {/* Stats Summary */}
+              <div className="text-xs py-3 px-4" style={{ color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
+                {filteredStats.sessions} sessions • {formatNumber(filteredStats.messages)} messages in {timeRangeState.preset}
               </div>
 
-              {/* Time Range Controls */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex gap-1">
-                  {['daily', 'weekly', 'all'].map(range => (
-                    <button
-                      key={range}
-                      onClick={() => setTimeRange(range)}
-                      className={`range-btn ${timeRange === range ? 'range-btn-active' : 'range-btn-inactive'}`}
-                    >
-                      {range === 'daily' ? '7 Days' : range === 'weekly' ? '30 Days' : 'All Time'}
-                    </button>
-                  ))}
+              {/* Date Picker Modal */}
+              {showDatePicker && (
+                <DatePickerModal
+                  onClose={() => setShowDatePicker(false)}
+                  onApply={(customRange) => {
+                    setTimeRangeState({ preset: 'custom', customRange });
+                    setShowDatePicker(false);
+                  }}
+                  initialRange={timeRangeState.customRange}
+                />
+              )}
+
+              {/* Main 12-Column Grid Layout */}
+              <div className="grid grid-cols-12 gap-4 p-4">
+
+                {/* Left Column (8 cols) - Charts */}
+                <div className="col-span-12 lg:col-span-8 space-y-4">
+
+                  {/* HERO: Session Leaderboard - Primary focus for comparing sessions */}
+                  <div className="card p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span style={{ color: COLORS.coral }}>{Icons.trophy}</span>
+                        <span className="text-sm font-medium" style={{ color: COLORS.text }}>Session Comparison</span>
+                      </div>
+                    </div>
+                    <SessionLeaderboard
+                      sessions={stats.sessions}
+                      timeRangeState={timeRangeState}
+                      onSessionSelect={setSelectedSessionId}
+                      selectedSessionId={selectedSessionId}
+                    />
+                  </div>
+
+                  {/* Session Growth Chart - Token accumulation over messages */}
+                  <div className="card p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span style={{ color: COLORS.textMuted }}>{Icons.growth}</span>
+                      <span className="text-xs font-medium" style={{ color: COLORS.textSecondary }}>Session Growth</span>
+                    </div>
+                    <SessionGrowth
+                      sessions={stats.sessions}
+                      timeRangeState={timeRangeState}
+                      selectedSessionId={selectedSessionId}
+                    />
+                  </div>
+
+                  {/* Activity Trends - Messages by date */}
+                  <div className="card p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span style={{ color: COLORS.textMuted }}>{Icons.trendingUp}</span>
+                      <span className="text-xs font-medium" style={{ color: COLORS.textSecondary }}>Activity Trends</span>
+                    </div>
+                    <TokenTimeline
+                      dailyModelTokens={stats.dailyModelTokens}
+                      dailyActivity={stats.dailyActivity}
+                      timeRangeState={timeRangeState}
+                      viewMode={viewMode}
+                      setViewMode={setViewMode}
+                    />
+                  </div>
+
+                  {/* Peak Activity Heatmap */}
+                  <div className="card p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span style={{ color: COLORS.textMuted }}>{Icons.grid}</span>
+                      <span className="text-sm font-medium" style={{ color: COLORS.text }}>Peak Activity</span>
+                    </div>
+                    <PeakHours sessions={stats.sessions} timeRangeState={timeRangeState} />
+                  </div>
+
                 </div>
-                <div className="text-xs" style={{ color: COLORS.textMuted }}>
-                  {filteredStats.sessions} sessions • {formatNumber(filteredStats.messages)} messages
-                </div>
-              </div>
 
-              {/* Timeline Chart */}
-              <div className="card p-5 mb-6">
-                <SectionHeader
-                  icon={Icons.trendingUp}
-                  title="Usage Trends"
-                  description="Token consumption over time"
-                />
-                <TokenTimeline
-                  dailyModelTokens={stats.dailyModelTokens}
-                  dailyActivity={stats.dailyActivity}
-                  timeRange={timeRange}
-                  viewMode={viewMode}
-                  setViewMode={setViewMode}
-                />
-              </div>
+                {/* Right Column (4 cols) - Navigation & Lists */}
+                <div className="col-span-12 lg:col-span-4 space-y-4">
 
-              {/* Session Growth Chart */}
-              <div className="card p-5 mb-6">
-                <SectionHeader
-                  icon={Icons.growth}
-                  title="Session Token Growth"
-                  description="How token usage evolves within a chat"
-                />
-                <SessionGrowth sessions={stats.sessions} />
-              </div>
-
-              {/* Peak Hours */}
-              <div className="card p-5 mb-6">
-                <SectionHeader
-                  icon={Icons.grid}
-                  title="Peak Hours"
-                  description="When you're most active"
-                />
-                <PeakHours hourlyActivity={stats.hourlyActivity} />
-              </div>
-
-              {/* Project Activity and Model Comparison */}
-              <div className="grid lg:grid-cols-3 gap-4 mb-6">
-                <div className="lg:col-span-2 card p-5 min-w-0">
-                  <SectionHeader
-                    icon={Icons.barChart}
-                    title="Project Activity"
-                    description="Token usage by project"
+                  {/* Activity Insights */}
+                  <ActivityInsights
+                    sessions={stats.sessions}
+                    dailyActivity={stats.dailyActivity}
                   />
-                  <SessionTimeline sessions={stats.sessions} timeRange={timeRange} />
-                </div>
-                <div className="card p-5 min-w-0">
-                  <SectionHeader
-                    icon={Icons.layers}
-                    title="Models"
-                    description="Input vs output"
+
+                  {/* Project Carousel */}
+                  <div className="card p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span style={{ color: COLORS.textMuted }}>{Icons.barChart}</span>
+                      <span className="text-xs font-medium" style={{ color: COLORS.textSecondary }}>Top Projects</span>
+                    </div>
+                    <ProjectList
+                      sessions={stats.sessions}
+                      timeRangeState={timeRangeState}
+                      onProjectClick={handleProjectClick}
+                    />
+                  </div>
+
+                  {/* Tabbed Sidebar - Recent Sessions */}
+                  <TabbedSidebar
+                    sessions={stats.sessions}
+                    timeRangeState={timeRangeState}
+                    onSessionSelect={setSelectedSessionId}
+                    onProjectClick={handleProjectClick}
+                    onSessionClick={handleSessionDetailClick}
+                    selectedSessionId={selectedSessionId}
                   />
-                  <ModelComparison modelUsage={stats.modelUsage} />
+
                 </div>
-              </div>
-
-              {/* Session Race */}
-              <div className="card p-5 mb-6 min-w-0">
-                <SectionHeader
-                  icon={Icons.race}
-                  title="Session Race"
-                  description="Watch sessions grow in real-time"
-                />
-                <SessionRace sessions={stats.sessions} viewMode={raceViewMode} setViewMode={setRaceViewMode} />
-              </div>
-
-              {/* Sessions */}
-              <div className="card p-5">
-                <SectionHeader
-                  icon={Icons.clock}
-                  title="Recent Sessions"
-                  description="Click a session for message details, or the chart icon for progression"
-                />
-                <SessionList
-                  sessions={stats.sessions}
-                  onProjectClick={handleProjectClick}
-                  onSessionClick={handleSessionDetailClick}
-                />
               </div>
 
               {/* Project Progression Modal */}
