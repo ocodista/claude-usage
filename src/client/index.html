@@ -1951,13 +1951,9 @@
             textStyle: { color: COLORS.textMuted, fontSize: 10 },
             bottom: 0
           },
-          grid: { left: 60, right: 20, top: 20, bottom: 55 },
+          grid: { left: 60, right: 20, top: 20, bottom: 40 },
           xAxis: {
             type: 'category',
-            name: 'MESSAGE #',
-            nameLocation: 'middle',
-            nameGap: 30,
-            nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace' },
             data: timeline.map((_, i) => `#${i + 1}`),
             axisLine: { lineStyle: { color: COLORS.borderSubtle } },
             axisLabel: { color: COLORS.textMuted, fontSize: 10, interval: Math.max(0, Math.floor(timeline.length / 12) - 1) },
@@ -3057,13 +3053,9 @@
             itemWidth: 12,
             itemHeight: 8
           },
-          grid: { left: 60, right: 15, top: 20, bottom: 50 },
+          grid: { left: 60, right: 15, top: 20, bottom: 40 },
           xAxis: {
             type: 'category',
-            name: 'MESSAGE #',
-            nameLocation: 'middle',
-            nameGap: 30,
-            nameTextStyle: { color: COLORS.textMuted, fontSize: 10, fontFamily: '"JetBrains Mono", monospace' },
             data: timeLabels,
             axisLine: { lineStyle: { color: COLORS.borderSubtle } },
             axisLabel: {
