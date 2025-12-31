@@ -4,6 +4,8 @@ import { sessionCache } from "./session-cache"
 import { basename } from "node:path"
 import { metrics } from "./metrics"
 import { logger } from "./logger"
+// @ts-ignore - Bun text import
+import HTML from "../client/index.html" with { type: "text" }
 
 const PORT = 3190 // C A I O
 const clients = new Set<{ send: (data: string) => void }>()
@@ -42,8 +44,6 @@ const watcher = createWatcher((changedPath) => {
   // Broadcast update
   broadcastUpdate()
 })
-
-const HTML = await Bun.file(import.meta.dir + "/../client/index.html").text()
 
 const server = Bun.serve({
   port: PORT,

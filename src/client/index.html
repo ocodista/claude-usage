@@ -2571,7 +2571,7 @@
     };
 
     // Compact KPI Strip for top bar
-    const KPIStrip = ({ stats, tokenRate }) => (
+    const KPIStrip = ({ stats, tokensPerDay }) => (
       <div className="flex items-center gap-6 py-3 px-4" style={{ borderBottom: `1px solid ${COLORS.border}` }}>
         <div className="flex items-center gap-2">
           <span className="text-xs" style={{ color: COLORS.textMuted }}>TOTAL</span>
@@ -2589,10 +2589,10 @@
           <span className="text-xs" style={{ color: COLORS.textMuted }}>CACHE</span>
           <span className="text-sm font-medium" style={{ color: COLORS.green }}>{stats.cacheEfficiency.toFixed(0)}%</span>
         </div>
-        {tokenRate > 0 && (
-          <div className="flex items-center gap-2" title="Average tokens per message in this period">
-            <span className="text-xs" style={{ color: COLORS.textMuted }}>TOKENS/MSG</span>
-            <span className="text-sm font-medium" style={{ color: COLORS.coral }}>~{formatNumber(tokenRate)}</span>
+        {tokensPerDay > 0 && (
+          <div className="flex items-center gap-2" title="Average tokens per day in this period">
+            <span className="text-xs" style={{ color: COLORS.textMuted }}>TOKENS/DAY</span>
+            <span className="text-sm font-medium" style={{ color: COLORS.coral }}>~{formatNumber(tokensPerDay)}</span>
           </div>
         )}
       </div>
@@ -3223,6 +3223,7 @@
         const chartSessions = [...sortedSessions];
 
         return {
+          backgroundColor: 'transparent',
           tooltip: {
             trigger: 'axis',
             axisPointer: { type: 'shadow' },
@@ -4453,18 +4454,21 @@
         };
       }, [stats.sessions, timeRangeState]);
 
-      // Calculate token rate from active sessions
-      const tokenRate = useMemo(() => {
-        const activeSessions = stats.sessions.filter(s => s.isCurrentSession);
-        if (activeSessions.length === 0) return 0;
+      // Calculate average tokens per day
+      const tokensPerDay = useMemo(() => {
+        const filteredSessions = filterSessionsByDateRange(stats.sessions, timeRangeState);
+        if (filteredSessions.length === 0) return 0;
 
-        // Calculate average tokens per message from active sessions
-        const totalTokens = activeSessions.reduce((sum, s) => sum + s.totalTokens, 0);
-        const totalMessages = activeSessions.reduce((sum, s) => sum + s.messageCount, 0);
+        // Get unique days with activity
+        const uniqueDays = new Set(
+          filteredSessions.map(s => new Date(s.startTime).toDateString())
+        );
+        const dayCount = uniqueDays.size;
+        if (dayCount === 0) return 0;
 
-        if (totalMessages === 0) return 0;
-        return Math.ceil(totalTokens / totalMessages);
-      }, [stats.sessions]);
+        const totalTokens = filteredSessions.reduce((sum, s) => sum + s.totalTokens, 0);
+        return Math.ceil(totalTokens / dayCount);
+      }, [stats.sessions, timeRangeState]);
 
       const handleProjectClick = useCallback((sessions, projectName) => {
         setSelectedProject({ sessions, projectName });
@@ -4569,7 +4573,7 @@
           ) : (
             <>
               {/* KPI Strip - Compact stats bar */}
-              <KPIStrip stats={stats} tokenRate={tokenRate} />
+              <KPIStrip stats={stats} tokensPerDay={tokensPerDay} />
 
               {/* Stats Summary */}
               <div className="text-xs py-3 px-4" style={{ color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
