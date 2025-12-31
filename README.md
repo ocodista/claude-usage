@@ -2,56 +2,47 @@
 
 Real-time token usage monitor for Claude Code.
 
-Track your Claude Code sessions, analyze token consumption, and estimate API costs—all in a live dashboard.
+Track sessions, analyze token consumption, estimate API costs—live dashboard.
 
-## Quick Start
+## Install
+
+### Option 1: One-liner (recommended)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ocodista/claude-usage/main/install.sh | bash
 ```
 
-Or install manually:
+Opens the dashboard automatically after install.
+
+### Option 2: Clone from source
 
 ```bash
 git clone https://github.com/ocodista/claude-usage.git
 cd claude-usage && bun install
-```
-
-## Usage
-
-Start the dashboard:
-
-```bash
 bun run src/server/index.ts
 ```
 
-Open http://localhost:3456
+Open http://localhost:3190
 
 ## Features
 
-**Live Dashboard**
-WebSocket-powered updates. See token usage change as you work.
+**Live Dashboard** — WebSocket-powered updates as you work.
 
-**Cost Tracking**
-Estimated costs by model. See cache savings and projected spending.
+**Cost Tracking** — Per-model costs with cache savings.
 
-**Session Analytics**
-Per-session breakdown with token timelines. Compare sessions side-by-side.
+**Session Analytics** — Token timelines and session comparisons.
 
-**Activity Insights**
-Discover your most active days, peak hours, and usage patterns.
+**Activity Insights** — Peak hours, active days, usage patterns.
 
-**Time Filtering**
-Filter by last week, month, year-to-date, or custom date range.
+**Time Filtering** — Week, month, year-to-date, or custom range.
 
-**Project Grouping**
-Sessions grouped by project folder. Track usage across codebases.
+**Project Grouping** — Sessions organized by codebase.
 
 ## How It Works
 
-The monitor watches `~/.claude` for file changes, parses JSONL session data, and broadcasts updates via WebSocket.
+Watches `~/.claude` for file changes, parses JSONL session data, broadcasts via WebSocket.
 
-See [docs/how-it-works.md](docs/how-it-works.md) for architecture details.
+See [docs/how-it-works.md](docs/how-it-works.md) for architecture.
 
 ## Stack
 
@@ -59,7 +50,7 @@ Bun, TypeScript, React 18, ECharts, Three.js
 
 ## Privacy
 
-All data stays local. No external connections. Your Claude usage data never leaves your machine.
+All data stays local. No external connections.
 
 ## License
 
