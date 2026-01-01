@@ -89,6 +89,10 @@ fi
 echo ""
 echo -e "  ${GREEN}✓ Installed successfully${NC}"
 echo ""
-echo -e "  ${BOLD}To start:${NC}     ${CYAN}${APP_NAME}${NC}"
 echo -e "  ${BOLD}To uninstall:${NC} ${DIM}curl -fsSL raw.githubusercontent.com/${REPO}/main/uninstall.sh | bash${NC}"
 echo ""
+echo -e "  ${DIM}Starting dashboard...${NC}"
+echo ""
+
+# Start the app (which auto-opens browser)
+exec ${APP_NAME}
