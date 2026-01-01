@@ -4,6 +4,8 @@ Real-time token usage monitor for Claude Code.
 
 Track sessions, analyze token consumption, estimate API costs—live dashboard.
 
+![Demo Video](demo.mov)
+
 ## Install
 
 ```bash
