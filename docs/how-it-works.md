@@ -4,8 +4,38 @@ Real-time Claude Code token usage monitor. Watches Claude's data files, parses J
 
 **Stack**: Bun, TypeScript, React 18, chokidar, ECharts
 
-## Architecture
+## Data Flow
 
+```mermaid
+sequenceDiagram
+autonumber
+
+box Backend
+participant Bun
+participant Disk as ~/.claude/
+end
+
+box CLI
+participant Claude as Claude Code CLI
+end
+
+box Frontend
+participant React
+end
+
+Note over Bun: Startup
+Bun->>Disk: Chokidar subscribes to file events
+
+Note over Claude: User Chat
+Claude->>Disk: Persist session changes
+
+Note over Bun,React: File Change Callback
+Disk-->>Bun: Chokidar triggers callback
+Bun->>Disk: Re-read & parse files
+Bun->>React: Broadcast via WebSocket
+```
+
+## Architecture
 ```mermaid
 flowchart LR
     subgraph Data["~/.claude"]
@@ -52,37 +82,6 @@ flowchart LR
     style Observe fill:#ffe1f5
 ```
 
-## Data Flow
-
-```mermaid
-sequenceDiagram
-    participant CC as Claude Code
-    participant FS as ~/.claude
-    participant CH as chokidar
-    participant SC as SessionCache
-    participant P as Parser
-    participant WS as WebSocket Server
-    participant UI as Dashboard
-
-    CC->>FS: Append to session.jsonl
-    FS->>CH: fsevents notification
-    CH->>CH: Debounce 150ms
-    CH->>SC: Invalidate changed session
-    CH->>P: Parse request
-
-    alt Cache hit
-        P->>SC: Check cache
-        SC-->>P: Return cached session
-    else Cache miss
-        P->>FS: Read JSONL files
-        P->>P: Aggregate tokens, calculate costs
-        P->>SC: Store in cache
-    end
-
-    P->>WS: broadcastUpdate()
-    WS->>UI: ws.send(stats_update)
-    UI->>UI: React setState → ECharts render
-```
 
 ## Server Layer
 
