@@ -124,12 +124,10 @@ const server = Bun.serve({
 })
 
 console.log(`
-  Claude Code Token Monitor
+  Claude Usage Dashboard
+  http://localhost:${PORT}
 
-  Server running at http://localhost:${PORT}
   Watching ~/.claude for changes...
-
-  Press Ctrl+C to stop
 `)
 
 // Graceful shutdown handler

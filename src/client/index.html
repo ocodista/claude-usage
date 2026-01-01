@@ -3,7 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Claude Code Token Monitor</title>
+  <title>Claude Usage</title>
+  <meta name="description" content="Real-time token usage dashboard for Claude Code. Track sessions, costs, and activity patterns. Open-source and fully offline.">
+  <meta name="keywords" content="Claude Code, token usage, dashboard, analytics, Anthropic, AI, developer tools">
+  <meta property="og:title" content="Claude Usage">
+  <meta property="og:description" content="Real-time token usage dashboard for Claude Code. Track sessions, costs, and activity patterns.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Claude Usage">
+  <meta name="twitter:description" content="Real-time token usage dashboard for Claude Code">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='barGrad' x1='0%25' y1='100%25' x2='0%25' y2='0%25'%3E%3Cstop offset='0%25' style='stop-color:%23a78bfa'/%3E%3Cstop offset='100%25' style='stop-color:%23c4b5fd'/%3E%3C/linearGradient%3E%3ClinearGradient id='accentGrad' x1='0%25' y1='100%25' x2='0%25' y2='0%25'%3E%3Cstop offset='0%25' style='stop-color:%23e87924'/%3E%3Cstop offset='100%25' style='stop-color:%23f59e0b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='6' fill='%231a1a1a'/%3E%3Crect x='4' y='18' width='5' height='10' rx='1' fill='url(%23barGrad)'/%3E%3Crect x='11' y='12' width='5' height='16' rx='1' fill='url(%23barGrad)'/%3E%3Crect x='18' y='6' width='5' height='22' rx='1' fill='url(%23accentGrad)'/%3E%3Crect x='25' y='14' width='5' height='14' rx='1' fill='url(%23barGrad)'/%3E%3Ccircle cx='27' cy='5' r='3' fill='%234ade80'/%3E%3C/svg%3E">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -3774,6 +3783,15 @@
     };
 
     // Pricing data for estimator
+    const HAIKU_PRICING = {
+      name: 'Haiku 3.5',
+      input: 0.80,
+      output: 4,
+      cacheRead: 0.08,
+      cacheWrite: 1,
+      color: '#06B6D4' // cyan to distinguish from cache green
+    };
+
     const PRICING_DATA = {
       'claude-opus-4-5-20251101': {
         name: 'Opus 4.5',
@@ -3791,14 +3809,8 @@
         cacheWrite: 3.75,
         color: COLORS.blue
       },
-      'claude-haiku-3-5-20241022': {
-        name: 'Haiku 3.5',
-        input: 0.80,
-        output: 4,
-        cacheRead: 0.08,
-        cacheWrite: 1,
-        color: COLORS.green
-      }
+      'claude-3-5-haiku-20241022': HAIKU_PRICING,
+      'claude-haiku-3-5-20241022': HAIKU_PRICING,
     };
 
     // Price Estimator Tab
@@ -4187,7 +4199,9 @@
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(PRICING_DATA).map(([id, p], idx) => (
+                  {Object.entries(PRICING_DATA).filter(([id, p], idx, arr) =>
+                    arr.findIndex(([, x]) => x.name === p.name) === idx
+                  ).map(([id, p]) => (
                     <tr key={id} className="border-t transition-colors hover:bg-white/5" style={{ borderColor: COLORS.borderSubtle }}>
                       <td className="p-4">
                         <div className="flex items-center gap-3">
@@ -4598,12 +4612,25 @@
                 {/* Left Column (8 cols) - Charts */}
                 <div className="col-span-12 lg:col-span-8 space-y-4">
 
-                  {/* HERO: Session Leaderboard - Primary focus for comparing sessions */}
+                  {/* HERO: Session Growth - Linear token growth insight */}
+                  <div className="card p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span style={{ color: COLORS.coral }}>{Icons.growth}</span>
+                      <span className="text-sm font-medium" style={{ color: COLORS.text }}>Session Growth</span>
+                    </div>
+                    <SessionGrowth
+                      sessions={stats.sessions}
+                      timeRangeState={timeRangeState}
+                      selectedSessionId={selectedSessionId}
+                    />
+                  </div>
+
+                  {/* Session Comparison - Token usage per session */}
                   <div className="card p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <span style={{ color: COLORS.coral }}>{Icons.trophy}</span>
-                        <span className="text-sm font-medium" style={{ color: COLORS.text }}>Session Comparison</span>
+                        <span style={{ color: COLORS.textMuted }}>{Icons.trophy}</span>
+                        <span className="text-xs font-medium" style={{ color: COLORS.textSecondary }}>Session Comparison</span>
                       </div>
                     </div>
                     <SessionLeaderboard
@@ -4614,17 +4641,13 @@
                     />
                   </div>
 
-                  {/* Session Growth Chart - Token accumulation over messages */}
+                  {/* Peak Activity Heatmap */}
                   <div className="card p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <span style={{ color: COLORS.textMuted }}>{Icons.growth}</span>
-                      <span className="text-xs font-medium" style={{ color: COLORS.textSecondary }}>Session Growth</span>
+                      <span style={{ color: COLORS.textMuted }}>{Icons.grid}</span>
+                      <span className="text-xs font-medium" style={{ color: COLORS.textSecondary }}>Peak Activity</span>
                     </div>
-                    <SessionGrowth
-                      sessions={stats.sessions}
-                      timeRangeState={timeRangeState}
-                      selectedSessionId={selectedSessionId}
-                    />
+                    <PeakHours sessions={stats.sessions} timeRangeState={timeRangeState} />
                   </div>
 
                   {/* Activity Trends - Messages by date */}
@@ -4640,15 +4663,6 @@
                       viewMode={viewMode}
                       setViewMode={setViewMode}
                     />
-                  </div>
-
-                  {/* Peak Activity Heatmap */}
-                  <div className="card p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span style={{ color: COLORS.textMuted }}>{Icons.grid}</span>
-                      <span className="text-sm font-medium" style={{ color: COLORS.text }}>Peak Activity</span>
-                    </div>
-                    <PeakHours sessions={stats.sessions} timeRangeState={timeRangeState} />
                   </div>
 
                 </div>
