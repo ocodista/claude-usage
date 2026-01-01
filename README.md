@@ -6,23 +6,23 @@ Track sessions, analyze token consumption, estimate API costs—live dashboard.
 
 ## Install
 
-### Option 1: One-liner (recommended)
-
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ocodista/claude-usage/main/install.sh | bash
 ```
 
-Opens the dashboard automatically after install.
-
-### Option 2: Clone from source
+## Usage
 
 ```bash
-git clone https://github.com/ocodista/claude-usage.git
-cd claude-usage && bun install
-bun run src/server/index.ts
+claude-code-usage
 ```
 
-Open http://localhost:3190
+Opens the dashboard at http://localhost:3190
+
+## Uninstall
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ocodista/claude-usage/main/uninstall.sh | bash
+```
 
 ## Features
 

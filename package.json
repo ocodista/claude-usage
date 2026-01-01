@@ -4,7 +4,7 @@
   "description": "Real-time Claude Code token usage monitor with interactive dashboard",
   "type": "module",
   "bin": {
-    "claude-usage": "./src/cli.ts"
+    "claude-code-usage": "./src/cli.ts"
   },
   "files": [
     "src",

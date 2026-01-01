@@ -19,7 +19,7 @@ async function buildAll() {
   }
 
   for (const target of targets) {
-    const outfile = `./dist/claude-usage-${target.platform}-${target.arch}${target.ext}`
+    const outfile = `./dist/claude-code-usage-${target.platform}-${target.arch}${target.ext}`
 
     console.log(`Building ${target.platform}-${target.arch}...`)
 
