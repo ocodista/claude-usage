@@ -4,10 +4,9 @@
 ![TypeScript](https://shields.io/badge/TypeScript-3178C6?logo=TypeScript&logoColor=FFF)
 ![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)
 
-
 A live dashboard that reads Claude Code’s local files, tracks token usage by project and session, and estimates what you would pay using API pricing.
 
-![Demo Video](./demo.mov)
+https://github.com/user-attachments/assets/9efc6ab9-0461-49a2-9c44-9bdab2903824
 
 ---
 
