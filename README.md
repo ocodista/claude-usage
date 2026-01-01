@@ -21,18 +21,47 @@ https://github.com/user-attachments/assets/9efc6ab9-0461-49a2-9c44-9bdab2903824
 ---
 
 ## How it works
+```mermaid
+sequenceDiagram
+autonumber
+
+box Backend
+participant Bun
+participant Disk as ~/.claude/
+end
+
+box CLI
+participant Claude as Claude Code CLI
+end
+
+box Frontend
+participant React
+end
+
+Note over Bun: Startup
+Bun->>Disk: Chokidar subscribes to file events
+
+Note over Claude: User Chat
+Claude->>Disk: Persist session changes
+
+Note over Bun,React: File Change Callback
+Disk-->>Bun: Chokidar triggers callback
+Bun->>Disk: Re-read & parse files
+Bun->>React: Broadcast via WebSocket
+```
 
 * Watches `~/.claude` for file changes (using [Chokidar](https://github.com/paulmillr/chokidar))
 * Parses Claude JSONL session logs
 * Aggregates usage in memory
 * Streams updates to a local React dashboard using WebSocket
 
+More details in [docs/how-it-works.md](docs/how-it-works.md).
+
 ---
 ## Install
 
 ```bash
 curl -fsSL https://ocodista.com/claude-usage-install.sh | bash
-
 ```
 
 ## Run
@@ -50,12 +79,6 @@ Opens at [http://localhost:3190](http://localhost:3190)
 ```bash
 curl -fsSL https://ocodista.com/claude-usage-uninstall.sh | bash
 ```
-
----
-
-## Stack
-
-Bun, TypeScript, React 18, ECharts, WebSocket
 
 ---
 
