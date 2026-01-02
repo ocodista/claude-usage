@@ -3001,17 +3001,31 @@
 
         const timeline = selectedSession.tokenTimeline;
 
-        // Calculate per-message deltas for a stacked area view
+        // Calculate per-message deltas and growth rates
         const inputDeltas = [];
         const outputDeltas = [];
+        const totalDeltas = [];
+        const growthRates = [];
         let prevInput = 0;
         let prevOutput = 0;
+        let prevTotal = 0;
 
         timeline.forEach((point, i) => {
-          inputDeltas.push(point.inputTokens - prevInput);
-          outputDeltas.push(point.outputTokens - prevOutput);
+          const inputDelta = point.inputTokens - prevInput;
+          const outputDelta = point.outputTokens - prevOutput;
+          const totalDelta = point.totalTokens - prevTotal;
+
+          inputDeltas.push(inputDelta);
+          outputDeltas.push(outputDelta);
+          totalDeltas.push(totalDelta);
+
+          // Calculate growth rate as percentage
+          const growthRate = prevTotal > 0 ? ((totalDelta / prevTotal) * 100) : 0;
+          growthRates.push(growthRate);
+
           prevInput = point.inputTokens;
           prevOutput = point.outputTokens;
+          prevTotal = point.totalTokens;
         });
 
         // Format time labels
@@ -3033,11 +3047,14 @@
               const time = new Date(point.timestamp).toLocaleTimeString('en-US', {
                 hour: '2-digit', minute: '2-digit'
               });
+              const rate = growthRates[idx];
+              const rateColor = rate > 50 ? COLORS.coral : rate > 20 ? COLORS.amber : COLORS.green;
               let result = `<div style="font-weight:600;margin-bottom:8px">Message ${idx + 1} <span style="color:${COLORS.textMuted};font-weight:400">${time}</span></div>`;
               result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
                 <span style="width:8px;height:8px;border-radius:50%;background:${COLORS.amber}"></span>
                 <span style="color:${COLORS.textSecondary}">Total:</span>
                 <span style="font-weight:500">${formatNumber(point.totalTokens)}</span>
+                <span style="color:${COLORS.textMuted}">(+${formatNumber(totalDeltas[idx])})</span>
               </div>`;
               result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
                 <span style="width:8px;height:8px;border-radius:50%;background:${COLORS.purple}"></span>
@@ -3051,6 +3068,12 @@
                 <span style="font-weight:500">${formatNumber(point.inputTokens)}</span>
                 <span style="color:${COLORS.textMuted}">(+${formatNumber(inputDeltas[idx])})</span>
               </div>`;
+              if (idx > 0) {
+                result += `<div style="display:flex;align-items:center;gap:8px;margin:8px 0 4px 0;padding-top:8px;border-top:1px solid ${COLORS.border}">
+                  <span style="color:${COLORS.textSecondary}">Growth Rate:</span>
+                  <span style="font-weight:600;color:${rateColor}">${rate.toFixed(1)}%</span>
+                </div>`;
+              }
               result += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid ${COLORS.border};font-size:11px;color:${COLORS.textMuted}">Click for details</div>`;
               return result;
             }
@@ -3489,6 +3512,14 @@
         const assistantMsgs = sessionDetail.messages.filter(m => m.type === 'assistant' && m.cumulativeTotal > 0);
         if (assistantMsgs.length === 0) return null;
 
+        // Calculate growth rates for context
+        const contextGrowthRates = assistantMsgs.map((msg, idx) => {
+          if (idx === 0) return 0;
+          const prevTotal = assistantMsgs[idx - 1].cumulativeTotal;
+          const delta = msg.cumulativeTotal - prevTotal;
+          return prevTotal > 0 ? (delta / prevTotal) * 100 : 0;
+        });
+
         return {
           backgroundColor: 'transparent',
           tooltip: {
@@ -3499,10 +3530,38 @@
             formatter: (params) => {
               const idx = params[0].dataIndex;
               const msg = assistantMsgs[idx];
-              return `<div style="font-weight:600;margin-bottom:8px">Message #${msg.index + 1}</div>
-                <div>Context: ${formatNumber(msg.cumulativeInput)}</div>
-                <div>Output: ${formatNumber(msg.cumulativeOutput)}</div>
-                <div style="color:${COLORS.amber}">Total: ${formatNumber(msg.cumulativeTotal)}</div>`;
+              const prevMsg = idx > 0 ? assistantMsgs[idx - 1] : null;
+              const inputDelta = prevMsg ? msg.cumulativeInput - prevMsg.cumulativeInput : msg.cumulativeInput;
+              const outputDelta = prevMsg ? msg.cumulativeOutput - prevMsg.cumulativeOutput : msg.cumulativeOutput;
+              const totalDelta = prevMsg ? msg.cumulativeTotal - prevMsg.cumulativeTotal : msg.cumulativeTotal;
+              const rate = contextGrowthRates[idx];
+              const rateColor = rate > 50 ? COLORS.coral : rate > 20 ? COLORS.amber : COLORS.green;
+              let result = `<div style="font-weight:600;margin-bottom:8px">Message #${msg.index + 1}</div>`;
+              result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                <span style="width:8px;height:8px;border-radius:50%;background:${COLORS.blue}"></span>
+                <span style="color:${COLORS.textSecondary}">Context:</span>
+                <span style="font-weight:500">${formatNumber(msg.cumulativeInput)}</span>
+                <span style="color:${COLORS.textMuted}">(+${formatNumber(inputDelta)})</span>
+              </div>`;
+              result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                <span style="width:8px;height:8px;border-radius:50%;background:${COLORS.purple}"></span>
+                <span style="color:${COLORS.textSecondary}">Output:</span>
+                <span style="font-weight:500">${formatNumber(msg.cumulativeOutput)}</span>
+                <span style="color:${COLORS.textMuted}">(+${formatNumber(outputDelta)})</span>
+              </div>`;
+              result += `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+                <span style="width:8px;height:8px;border-radius:50%;background:${COLORS.amber}"></span>
+                <span style="color:${COLORS.textSecondary}">Total:</span>
+                <span style="font-weight:500">${formatNumber(msg.cumulativeTotal)}</span>
+                <span style="color:${COLORS.textMuted}">(+${formatNumber(totalDelta)})</span>
+              </div>`;
+              if (idx > 0) {
+                result += `<div style="display:flex;align-items:center;gap:8px;margin:8px 0 4px 0;padding-top:8px;border-top:1px solid ${COLORS.border}">
+                  <span style="color:${COLORS.textSecondary}">Growth Rate:</span>
+                  <span style="font-weight:600;color:${rateColor}">${rate.toFixed(1)}%</span>
+                </div>`;
+              }
+              return result;
             }
           },
           grid: { left: 60, right: 20, top: 30, bottom: 40 },
