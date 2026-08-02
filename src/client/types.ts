@@ -58,6 +58,7 @@ export interface SessionInfo {
   startTime: string
   lastActivity: string
   costUSD: number
+  costByLocalDate?: Record<string, number>
   isCurrentSession: boolean
   tokenTimeline?: TokenTimePoint[]
 }

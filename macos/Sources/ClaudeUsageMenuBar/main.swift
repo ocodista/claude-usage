@@ -83,7 +83,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             consecutiveFailures += 1
             renderOffline()
-            if consecutiveFailures == 1 {
+            if EngineRecoveryPolicy.shouldAttemptStart(
+                consecutiveFailures: consecutiveFailures,
+                processIsRunning: engine.isRunning
+            ) {
                 engine.startIfNeeded()
             }
         }
@@ -111,7 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func startEngine() {
-        engine.startIfNeeded(force: true)
+        engine.startIfNeeded()
         Task {
             try? await Task.sleep(for: .seconds(1))
             await refresh()
@@ -127,11 +130,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 final class UsageEngine {
     private var process: Process?
 
-    func startIfNeeded(force: Bool = false) {
-        if process?.isRunning == true {
-            if !force { return }
-            process?.terminate()
-        }
+    var isRunning: Bool { process?.isRunning == true }
+
+    func startIfNeeded() {
+        if isRunning { return }
 
         guard let executableURL = executableURL() else { return }
         let child = Process()
