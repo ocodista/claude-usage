@@ -4,10 +4,10 @@ import { sessionCache } from "./session-cache"
 import { basename } from "node:path"
 import { metrics } from "./metrics"
 import { logger } from "./logger"
+import { isAllowedOrigin, SERVER_HOST, SERVER_PORT } from "./config"
 // @ts-ignore - Bun text import
 import HTML from "../client/index.html" with { type: "text" }
 
-const PORT = 3190 // C A I O
 const clients = new Set<{ send: (data: string) => void }>()
 
 async function broadcastUpdate() {
@@ -46,8 +46,13 @@ const watcher = createWatcher((changedPath) => {
 })
 
 const server = Bun.serve({
-  port: PORT,
+  hostname: SERVER_HOST,
+  port: SERVER_PORT,
   async fetch(req, server) {
+    if (!isAllowedOrigin(req.headers.get("origin"))) {
+      return new Response("Forbidden", { status: 403 })
+    }
+
     const url = new URL(req.url)
 
     if (url.pathname === "/ws") {
@@ -125,7 +130,7 @@ const server = Bun.serve({
 
 console.log(`
   Claude Usage Dashboard
-  http://localhost:${PORT}
+  http://${SERVER_HOST}:${SERVER_PORT}
 
   Watching ~/.claude for changes...
 `)

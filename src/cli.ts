@@ -17,18 +17,27 @@ function openBrowser() {
   spawn([opener, url])
 }
 
+async function startServer() {
+  await import("./server/index")
+}
+
 async function main() {
   switch (command) {
     case "start":
       // Open browser after a short delay to let server start
       setTimeout(openBrowser, 500)
       // Start the server
-      await import("./server/index.ts")
+      await startServer()
+      break
+
+    case "serve":
+      // Start without opening a browser (used by the macOS menu-bar app)
+      await startServer()
       break
 
     case "stats":
       // Show quick stats without starting server
-      const { getTokenStats } = await import("./server/parser.ts")
+      const { getTokenStats } = await import("./server/parser")
       const stats = await getTokenStats()
       console.log("\nClaude Code Usage Stats:")
       console.log(`Total Tokens: ${stats.totalTokens.toLocaleString()}`)
@@ -60,6 +69,7 @@ Usage: claude-code-usage [command]
 
 Commands:
   start       Start dashboard and open browser (default)
+  serve       Start dashboard without opening a browser
   stats       Show quick token statistics
   open        Open dashboard in browser
   version     Show version number
@@ -67,6 +77,7 @@ Commands:
 
 Examples:
   claude-code-usage           # Start and open browser
+  claude-code-usage serve     # Start in the background
   claude-code-usage stats     # Quick stats
 `)
       process.exit(0)

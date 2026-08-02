@@ -46,6 +46,26 @@ Opens at [http://localhost:3190](http://localhost:3190)
 
 ---
 
+## macOS menu bar
+
+The native **Claude Usage** companion keeps today's API-equivalent cost in
+the menu bar and shows the active project, session tokens, and all-time usage.
+It starts the local usage engine in the background and opens the full dashboard
+on demand.
+
+Build and install it locally on Apple Silicon:
+
+```bash
+./macos/build-app.sh
+./macos/install-app.sh
+```
+
+The locally signed app is installed to `~/Applications/Claude Usage.app`. It is a menu-bar
+accessory (`LSUIElement`) and does not add a Dock icon. The generated app and
+zip archive remain under `dist/` and are not committed.
+
+---
+
 ## Uninstall
 
 ```bash
