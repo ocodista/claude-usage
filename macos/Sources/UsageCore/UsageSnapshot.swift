@@ -68,3 +68,9 @@ public enum UsagePresentation {
         return NSDecimalNumber(decimal: result).doubleValue
     }
 }
+
+public enum EngineRecoveryPolicy {
+    public static func shouldAttemptStart(consecutiveFailures: Int, processIsRunning: Bool) -> Bool {
+        consecutiveFailures > 0 && !processIsRunning
+    }
+}

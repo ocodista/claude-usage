@@ -76,3 +76,15 @@ final class UsagePresentationTests: XCTestCase {
         XCTAssertEqual(UsagePresentation.sessionSummary(for: snapshot), "my-website · 12.3K · $1.50")
     }
 }
+
+final class EngineRecoveryPolicyTests: XCTestCase {
+    func testRetriesAfterEveryContinuedFailureWhenEngineIsNotRunning() {
+        XCTAssertTrue(EngineRecoveryPolicy.shouldAttemptStart(consecutiveFailures: 1, processIsRunning: false))
+        XCTAssertTrue(EngineRecoveryPolicy.shouldAttemptStart(consecutiveFailures: 2, processIsRunning: false))
+        XCTAssertTrue(EngineRecoveryPolicy.shouldAttemptStart(consecutiveFailures: 10, processIsRunning: false))
+    }
+
+    func testDoesNotStartAnotherEngineWhileManagedProcessIsRunning() {
+        XCTAssertFalse(EngineRecoveryPolicy.shouldAttemptStart(consecutiveFailures: 2, processIsRunning: true))
+    }
+}

@@ -51,6 +51,52 @@ export function calculateCost(
   )
 }
 
+const localDateFormatters = new Map<string, Intl.DateTimeFormat>()
+
+export function localDateKey(timestamp: string, timeZone?: string): string | null {
+  if (!timestamp) return null
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return null
+
+  const formatterKey = timeZone ?? "system"
+  let formatter = localDateFormatters.get(formatterKey)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+    localDateFormatters.set(formatterKey, formatter)
+  }
+
+  const parts = Object.fromEntries(
+    formatter.formatToParts(date).map((part) => [part.type, part.value])
+  )
+  return `${parts.year}-${parts.month}-${parts.day}`
+}
+
+export function recordCostByLocalDate(
+  costs: Record<string, number>,
+  timestamp: string,
+  costUSD: number,
+  timeZone?: string
+): void {
+  const dateKey = localDateKey(timestamp, timeZone)
+  if (!dateKey) return
+  costs[dateKey] = (costs[dateKey] ?? 0) + costUSD
+}
+
+export function sumCostForLocalDate(
+  sessions: Array<Pick<SessionInfo, "costByLocalDate">>,
+  dateKey: string
+): number {
+  return sessions.reduce(
+    (total, session) => total + (session.costByLocalDate?.[dateKey] ?? 0),
+    0
+  )
+}
+
 export async function parseStatsCache(): Promise<StatsCache | null> {
   try {
     const content = await readFile(STATS_FILE, "utf-8")
@@ -97,6 +143,7 @@ interface UsageData {
 }
 
 interface MessageContent {
+  id?: string
   model?: string
   usage?: UsageData
 }
@@ -107,6 +154,84 @@ interface SessionMessage {
   message?: MessageContent
   gitBranch?: string
   cwd?: string
+}
+
+export interface AssistantUsageAggregate {
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheWriteTokens: number
+  costUSD: number
+  costByLocalDate: Record<string, number>
+  model: string
+  tokenTimeline: Array<{
+    timestamp: string
+    inputTokens: number
+    outputTokens: number
+    totalTokens: number
+  }>
+}
+
+export function aggregateAssistantUsage(
+  messages: SessionMessage[],
+  timeZone?: string
+): AssistantUsageAggregate {
+  const seenMessageIds = new Set<string>()
+  const result: AssistantUsageAggregate = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    costUSD: 0,
+    costByLocalDate: {},
+    model: "",
+    tokenTimeline: [],
+  }
+
+  for (const msg of messages) {
+    if (msg.type !== "assistant" || !msg.message?.usage) continue
+
+    const messageId = msg.message.id
+    if (messageId) {
+      if (seenMessageIds.has(messageId)) continue
+      seenMessageIds.add(messageId)
+    }
+
+    const usage = msg.message.usage
+    const usageModel = msg.message.model || result.model || "default"
+    if (!result.model && msg.message.model) result.model = msg.message.model
+
+    result.inputTokens += usage.input_tokens ?? 0
+    result.outputTokens += usage.output_tokens ?? 0
+    result.cacheReadTokens += usage.cache_read_input_tokens ?? 0
+    result.cacheWriteTokens += usage.cache_creation_input_tokens ?? 0
+
+    const messageCost = calculateCost(
+      usageModel,
+      usage.input_tokens ?? 0,
+      usage.output_tokens ?? 0,
+      usage.cache_read_input_tokens ?? 0,
+      usage.cache_creation_input_tokens ?? 0
+    )
+    result.costUSD += messageCost
+
+    if (msg.timestamp) {
+      recordCostByLocalDate(
+        result.costByLocalDate,
+        msg.timestamp,
+        messageCost,
+        timeZone
+      )
+      result.tokenTimeline.push({
+        timestamp: msg.timestamp,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        totalTokens: result.inputTokens + result.outputTokens,
+      })
+    }
+  }
+
+  return result
 }
 
 async function parseSessionFile(
@@ -121,49 +246,23 @@ async function parseSessionFile(
     const content = await readFile(filePath, "utf-8")
     const lines = content.trim().split("\n")
 
-    let inputTokens = 0
-    let outputTokens = 0
-    let cacheReadTokens = 0
-    let cacheWriteTokens = 0
     let messageCount = 0
-    let model = ""
     let startTime = ""
     let lastActivity = ""
     let project = decodeURIComponent(projectDir).replace(/%/g, "/")
     let branch = ""
-    const tokenTimeline: Array<{ timestamp: string; inputTokens: number; outputTokens: number; totalTokens: number }> = []
+    const sessionMessages: SessionMessage[] = []
 
     for (const line of lines) {
       if (!line) continue
       try {
         const msg = JSON.parse(line) as SessionMessage
+        sessionMessages.push(msg)
         messageCount++
 
         if (msg.timestamp) {
           if (!startTime) startTime = msg.timestamp
           lastActivity = msg.timestamp
-        }
-
-        if (msg.type === "assistant" && msg.message?.usage) {
-          const usage = msg.message.usage
-          inputTokens += usage.input_tokens ?? 0
-          outputTokens += usage.output_tokens ?? 0
-          cacheReadTokens += usage.cache_read_input_tokens ?? 0
-          cacheWriteTokens += usage.cache_creation_input_tokens ?? 0
-
-          // Record cumulative tokens at this timestamp
-          if (msg.timestamp) {
-            tokenTimeline.push({
-              timestamp: msg.timestamp,
-              inputTokens,
-              outputTokens,
-              totalTokens: inputTokens + outputTokens
-            })
-          }
-        }
-
-        if (msg.type === "assistant" && msg.message?.model && !model) {
-          model = msg.message.model
         }
 
         if (msg.gitBranch && !branch) {
@@ -182,15 +281,9 @@ async function parseSessionFile(
       project = historyEntry.project
     }
 
-    if (messageCount > 0) {
-      const costUSD = calculateCost(
-        model || "default",
-        inputTokens,
-        outputTokens,
-        cacheReadTokens,
-        cacheWriteTokens
-      )
+    const usage = aggregateAssistantUsage(sessionMessages)
 
+    if (messageCount > 0) {
       const lastActivityTime = new Date(lastActivity).getTime()
       const isCurrentSession = currentSessionId
         ? sessionId === currentSessionId
@@ -201,17 +294,18 @@ async function parseSessionFile(
         project,
         branch: branch || undefined,
         messageCount,
-        totalTokens: inputTokens + outputTokens,
-        inputTokens,
-        outputTokens,
-        cacheTokens: cacheReadTokens,
-        cacheWriteTokens,
-        model: model || "unknown",
+        totalTokens: usage.inputTokens + usage.outputTokens,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cacheTokens: usage.cacheReadTokens,
+        cacheWriteTokens: usage.cacheWriteTokens,
+        model: usage.model || "unknown",
         startTime,
         lastActivity,
-        costUSD,
+        costUSD: usage.costUSD,
+        costByLocalDate: usage.costByLocalDate,
         isCurrentSession,
-        tokenTimeline: tokenTimeline.length > 0 ? tokenTimeline : undefined,
+        tokenTimeline: usage.tokenTimeline.length > 0 ? usage.tokenTimeline : undefined,
       }
     }
 
@@ -472,16 +566,13 @@ export async function getTokenStats(): Promise<TokenStats> {
   const sessions = await parseSessions()
 
   // Calculate total and today's cost from sessions
-  const today = new Date().toISOString().split("T")[0]
+  const today = localDateKey(new Date().toISOString())
   let totalCostUSD = 0
-  let todayCostUSD = 0
+  const todayCostUSD = today ? sumCostForLocalDate(sessions, today) : 0
   let currentSession: SessionInfo | null = null
 
   for (const session of sessions) {
     totalCostUSD += session.costUSD
-    if (session.lastActivity.startsWith(today)) {
-      todayCostUSD += session.costUSD
-    }
     if (session.isCurrentSession && !currentSession) {
       currentSession = session
     }
